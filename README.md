@@ -15,7 +15,11 @@ Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一�
 ├── scripts/
 │   └── tsdown.client.ts    # 共享打包 preset：Node 半 + 浏览器半（见下）
 └── packages/
-    └── ui-hello/           # @auto-coding/ui-hello
+    ├── ui-hello/           # @auto-coding/ui-hello：侧边栏脚部按钮（list Slot 样板）
+    └── ui-requirements/    # @auto-coding/ui-requirements：顶部会话视图 tab「需求面板」
+        │                   #   conversation.view（list Slot，与 chat/trajectory 同环），
+        │                   #   面板为内存态需求清单（添加/勾选/删除）
+        └── …
         ├── package.json    # exports + dsh.client 声明 + peer 依赖
         ├── tsdown.config.ts
         ├── src/

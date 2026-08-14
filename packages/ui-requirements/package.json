@@ -1,6 +1,6 @@
 {
-  "name": "@auto-coding/ui-hello",
-  "description": "Scaffold UI plugin: one additive sidebar footer action (Web GUI client half)",
+  "name": "@auto-coding/ui-requirements",
+  "description": "Requirements panel as a conversation view tab (Web GUI client half)",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -31,13 +31,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.0.1-rc.1",
     "react": "^18.2.0"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-runtime": "link:/root/workspace/deepseek-harness/packages/client/runtime",
-    "@deepseek-ai/dsh-client-ui-sidebar": "link:/root/workspace/deepseek-harness/packages/client/ui-sidebar",
-    "@deepseek-ai/dsh-client-ui-slots": "link:/root/workspace/deepseek-harness/packages/client/ui-slots",
+    "@deepseek-ai/dsh-client-ui-conversation": "link:/root/workspace/deepseek-harness/packages/client/ui-conversation",
     "@types/react": "~18.3.1",
     "react": "^18.3.1",
     "tsdown": "^0.22.2"
