@@ -20,7 +20,7 @@ export const inject = ['slots']
  */
 export function apply(ctx: Context): void {
   ctx.slots.inject('conversation.view', () => ctx.slots.register(
-    { name: 'conversation.view', id: 'requirements', order: 20, label: '需求面板' },
+    { name: 'conversation.view', id: 'requirements', order: 15, label: '需求面板' },
     RequirementsPanel,
   ))
 }
