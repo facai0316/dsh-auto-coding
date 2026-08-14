@@ -21,6 +21,7 @@
  */
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { basename, dirname, resolve as resolvePath, sep } from 'node:path'
 import type { UserConfig } from 'tsdown'
 import { transform } from 'lightningcss'
@@ -59,11 +60,14 @@ const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 
 /**
- * Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline.
- * The suffix matters: tsdown's guard matches ids ending in `.css`.
+ * Virtual-id wrappers keeping CSS away from tsdown's own css pipeline (which
+ * requires @tsdown/css). The suffixes matter: tsdown's guard matches ids
+ * ending in `.css`, so the virtual ids must not.
  */
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
+const PLAIN_CSS_PREFIX = '\0dsh-plain-css:'
+const PLAIN_CSS_SUFFIX = '.mjs'
 
 /**
  * Build both halves of one UI plugin package: the Node library and the
@@ -133,6 +137,30 @@ function clientConfig(id: string): UserConfig {
         },
       },
       {
+        // Barrel resolution fix for component libraries (e.g. Semi): packages
+        // without an exports map resolve their bare specifier to the CJS
+        // `main` entry under rolldown, and CJS cannot be tree-shaken — every
+        // icon of @douyinfe/semi-icons would land in the bundle. Rewrite the
+        // resolved id onto the mirrored lib/es/ ESM tree (semi mirrors
+        // lib/cjs ↔ lib/es) and clear moduleSideEffects so unused re-exports
+        // drop. Scoped to bare @douyinfe/* specifiers (the barrels); deep
+        // subpaths carry their own exports entries and are unaffected.
+        name: 'dsh-barrel-esm-resolve',
+        resolveId(source: string, importer: string | undefined) {
+          if (importer === undefined || !source.startsWith('@douyinfe/')) return null
+          if (source.includes('/', '@douyinfe/'.length)) return null // subpath, not the barrel
+          let resolved: string
+          try {
+            resolved = createRequire(importer).resolve(source)
+          } catch {
+            return null
+          }
+          const esm = resolved.replace(`${sep}lib${sep}cjs${sep}`, `${sep}lib${sep}es${sep}`)
+          const id = existsSync(esm) ? esm : resolved
+          return { id, moduleSideEffects: false }
+        },
+      },
+      {
         // CSS Modules compiled inline: importing `x.module.css` yields the
         // hashed class map; the css text auto-injects a
         // <style data-plugin="<id>"> tag at factory execution.
@@ -167,6 +195,43 @@ function clientConfig(id: string): UserConfig {
             '  document.head.appendChild(tag);',
             '}',
             `export default ${JSON.stringify(classMap)};`,
+          ].join('\n')
+        },
+      },
+      {
+        // Plain stylesheet import (e.g. a component library's dist css):
+        // resolved from the importing file, inlined as-is, and injected as a
+        // <style data-plugin> tag at factory execution — same idempotent
+        // tag-per-file scheme as CSS Modules, minus the class map.
+        name: 'dsh-plain-css-inline',
+        resolveId(source: string, importer: string | undefined) {
+          if (!source.endsWith('.css') || source.endsWith('.module.css')) return null
+          if (importer === undefined) return null
+          let abs: string
+          try {
+            abs = createRequire(importer).resolve(source)
+          } catch {
+            return null // let other resolvers (or a loud error) handle it
+          }
+          return PLAIN_CSS_PREFIX + abs + PLAIN_CSS_SUFFIX
+        },
+        async load(virtualId: string) {
+          if (!virtualId.startsWith(PLAIN_CSS_PREFIX)) return null
+          const fileId = virtualId.slice(PLAIN_CSS_PREFIX.length, -PLAIN_CSS_SUFFIX.length)
+          this.addWatchFile(fileId)
+          const css = await readFile(fileId, 'utf8')
+          const tagId = `${id}/css/${basename(fileId)}`
+          return [
+            `const css = ${JSON.stringify(css)};`,
+            `const tagId = ${JSON.stringify(tagId)};`,
+            'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
+            '  const tag = document.createElement(\'style\');',
+            `  tag.dataset.plugin = ${JSON.stringify(id)};`,
+            '  tag.dataset.pluginCss = tagId;',
+            '  tag.textContent = css;',
+            '  document.head.appendChild(tag);',
+            '}',
+            'export default {};',
           ].join('\n')
         },
       },

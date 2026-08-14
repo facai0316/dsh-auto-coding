@@ -29,15 +29,21 @@
     "watch": "tsdown --watch",
     "typecheck": "tsc -p tsconfig.json"
   },
+  "dependencies": {
+    "@douyinfe/semi-ui": "^2.102.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "react": "^18.2.0"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-runtime": "link:/root/workspace/deepseek-harness/packages/client/runtime",
     "@deepseek-ai/dsh-client-ui-conversation": "link:/root/workspace/deepseek-harness/packages/client/ui-conversation",
     "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.1",
     "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tsdown": "^0.22.2"
   },
   "files": [

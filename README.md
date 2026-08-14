@@ -55,6 +55,16 @@ pnpm test         # vitest
 
 ## 依赖说明（重要）
 
+### 普通第三方库（如组件库 Semi Design）
+
+可以装。架构约定：**平台模块（react/cordis/ui-slots 等）由部署侧提供，其余普通库全部内联进 `lib/client.js`**（打包纯度门禁只拦 `@deepseek-ai/*` 跨插件值导入，普通 npm 库不受限）。`ui-requirements` 已示例接入 `@douyinfe/semi-ui`（dependencies 内联打包，react/react-dom 走 peer + 模块表）。接入要点（都在 `scripts/tsdown.client.ts` 里解决好了）：
+
+- **普通 CSS 文件**（如 `semi.min.css`）：preset 的 plain-css 处理器解析、内联、以 `<style data-plugin>` 注入，与 CSS Module 同一套幂等标签方案。semi 的 `dist/css` 不在其 exports 白名单，用相对路径引入（`src/client/semi-css.ts`）。
+- **组件按深路径引入**（`@douyinfe/semi-ui/lib/es/button`）：semi 把 barrel 标记为 side-effectful，经 barrel 无法摇树。
+- **无 exports map 的包会解析到 CJS main**（CJS 不可摇树，semi-icons 1400 个图标全量进包）：preset 的 barrel-esm-resolve 钩子把 `lib/cjs/` 改写为镜像的 `lib/es/` 并清 moduleSideEffects——接入后产物从 2.58MB 降到 1.30MB。
+
+### DSH 系列包
+
 - `@deepseek-ai/dsh-client-*` npm 发布集不完整（如 `dsh-compact`、`dsh-user-interaction` 未发布），从 npm 安装其依赖树会 404。
 - 因此 `packages/*/devDependencies` 里的 DSH 包全部用 `link:` 指向本地 harness 检出（默认 `/root/workspace/deepseek-harness`），**仅作类型来源**（本仓库对它们只有 type-only import，产物里一律被 external 或擦除，不影响任何运行时）。
 - 运行时依赖以 `peerDependencies` 由部署侧满足；换检出路径时改各包 `package.json` 里的 `link:` 目标即可。

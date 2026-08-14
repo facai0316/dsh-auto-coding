@@ -1,4 +1,8 @@
-/* 需求面板 view body. Colors ride the dsh theme alias tokens. */
+/*
+ * 需求面板 layout shell. Visual skin comes from Semi Design
+ * (semi.min.css, injected by the tsdown preset); this module only places
+ * the blocks inside the conversation view body.
+ */
 
 .panel {
   display: flex;
@@ -18,33 +22,6 @@
 .input {
   flex: 1;
   min-width: 0;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-}
-
-.input:focus-visible {
-  outline: 1px solid var(--dsw-alias-border-l1);
-}
-
-.addBtn {
-  height: 30px;
-  padding: 0 14px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.addBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .list {
@@ -53,8 +30,10 @@
   flex-direction: column;
   gap: 4px;
   margin: 0;
-  padding: 0;
+  padding: 4px;
   overflow: auto;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 6px;
   list-style: none;
 }
 
@@ -62,54 +41,37 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
+  min-height: 36px;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .item:hover {
-  background: color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent);
-}
-
-.item[data-done='true'] .text {
-  color: var(--dsw-alias-label-tertiary);
-  text-decoration: line-through;
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.del {
-  border: 0;
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  cursor: pointer;
-  opacity: 0;
+  background: var(--semi-color-fill-0);
 }
 
 .item:hover .del {
   opacity: 1;
 }
 
-.del:hover {
-  color: var(--dsw-alias-state-error-primary);
+.text {
+  flex: 1;
+  min-width: 0;
 }
 
-.empty {
-  margin: 0;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 13px;
+.del {
+  opacity: 0;
+}
+
+.emptyWrap {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
 }
 
 .foot {
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

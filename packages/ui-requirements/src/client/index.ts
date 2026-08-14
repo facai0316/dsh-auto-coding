@@ -6,6 +6,10 @@
  * wrapper, so plugin unload removes the tab.
  */
 import type { Context } from '@deepseek-ai/cordis'
+// Semi Design's compiled stylesheet, inlined as a <style data-plugin> tag by
+// the shared tsdown preset (plain-css handler). Import before the component
+// so the tag lands before first render.
+import './semi-css.ts'
 // Type-only: the 'conversation.view' SlotMap row (declared by the slot's
 // owning package) must be in the program for the register call to type.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
