@@ -1,0 +1,30 @@
+/* One additive sidebar-foot action. Colors ride the dsh theme alias tokens. */
+
+.action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 28px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent);
+}
+
+.action[data-wide='false'] .label {
+  font-size: 10px;
+}
+
+.label {
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,0 +1,23 @@
+{
+  "name": "auto-coding-plugins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Out-of-tree dsh (Cordis) plugin packages: pnpm monorepo, one package per plugin.",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "watch": "pnpm -r --if-present --parallel watch",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "lightningcss": "^1.33.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

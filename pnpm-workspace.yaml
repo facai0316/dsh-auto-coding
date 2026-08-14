@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+
+# The sandbox mounts most of $HOME read-only; keep the pnpm store inside the
+# writable workspace (gitignored as .pnpm-store/).
+storeDir: .pnpm-store
