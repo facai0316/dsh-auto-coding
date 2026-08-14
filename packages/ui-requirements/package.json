@@ -40,6 +40,7 @@
   "devDependencies": {
     "@deepseek-ai/dsh-client-runtime": "link:/root/workspace/deepseek-harness/packages/client/runtime",
     "@deepseek-ai/dsh-client-ui-conversation": "link:/root/workspace/deepseek-harness/packages/client/ui-conversation",
+    "@deepseek-ai/dsh-client-ui-theme": "link:/root/workspace/deepseek-harness/packages/client/ui-theme",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
     "react": "^18.3.1",

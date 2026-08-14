@@ -61,6 +61,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: link:/root/workspace/deepseek-harness/packages/client/ui-conversation
         version: link:../../../deepseek-harness/packages/client/ui-conversation
+      '@deepseek-ai/dsh-client-ui-theme':
+        specifier: link:/root/workspace/deepseek-harness/packages/client/ui-theme
+        version: link:../../../deepseek-harness/packages/client/ui-theme
       '@types/react':
         specifier: ~18.3.1
         version: 18.3.31
