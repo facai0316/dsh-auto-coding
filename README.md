@@ -61,23 +61,39 @@ pnpm test         # vitest
 
 ## 挂载进 dsh（以本机 web profile 为例）
 
-1. 把构建好的包装进 profile（profile 是一个独立的 pnpm 工作区）：
+**推荐：`link:` 符号链接 + client-hmr 热加载回路**（本机已按此安装 `ui-requirements`）：
+
+1. 符号链接进 profile 的 node_modules，并在 profile `package.json` 的 `dependencies` 登记 `"@auto-coding/<name>": "link:<repo>/packages/<name>"`：
 
    ```sh
-   pnpm --dir ~/.dsh/profiles/web add file:/root/workspace/auto-coding-plugins/packages/ui-hello
+   mkdir -p ~/.dsh/profiles/web/node_modules/@auto-coding
+   ln -sfn $PWD/packages/ui-requirements ~/.dsh/profiles/web/node_modules/@auto-coding/ui-requirements
    ```
 
-2. 在 `~/.dsh/profiles/web/cordis.patch.yml` 末尾追加 insert 行：
+2. `~/.dsh/profiles/web/cordis.patch.yml` 追加：
 
    ```yaml
    - insert:
-       - id: ui-hello
-         name: '@auto-coding/ui-hello'
+       - id: ui-requirements
+         name: '@auto-coding/ui-requirements'
    ```
 
-3. 重启该 profile 的 `dsh web`。启动时 host 扫描启用条目的 `dsh.client` 声明，把 `lib/client.js` 以 `/plugins/<id>/client.js` 进 boot 图；刷新页面后侧边栏 Settings 上方应出现 Hello 按钮。
+3. 重启该 profile 的 `dsh web`（插件行的增删只在重启时生效；bundle 内容变化走 HMR，无需重启）。
 
-> UI 插件必须走「包安装」方式（host 要解析 `exports["./client"]`）；`./plugins/xxx/index.mjs` 相对路径行只适合 host-only 插件（如 web-gate）。
+### 前端式热加载开发回路
+
+`client-hmr`（web-app bundle 自带）每 500ms stat-poll boot 图里每个 `dsh.client` 包的 `lib/client.js`。配合符号链接，回路是：
+
+```
+保存 src/client/*.tsx / *.module.css
+  → 仓库根 pnpm watch（tsdown --watch，改样式只动 CSS Module 也会触发整包重建）
+  → lib/client.js 变更 → client-hmr 重哈希 → SSE 推送
+  → 浏览器免刷新热替换插件（含 <style> 标签整体换掉）
+```
+
+即改 `RequirementsPanel.module.css` 保存后约 1 秒内页面就地更新，无需刷新。
+
+> UI 插件必须走「包安装」方式（host 要解析 `exports["./client"]`）；`./plugins/xxx/index.mjs` 相对路径行只适合 host-only 插件（如 web-gate）。用 `file:` 安装会**复制**包体，热加载回路随之失效，故用 `link:`。
 
 ## 新增一个插件包
 
