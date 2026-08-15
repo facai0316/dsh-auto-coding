@@ -1,9 +1,10 @@
 /**
  * ui-requirements browser half: one `conversation.view` list entry — the
  * view-tab ring the session body renders one-at-a-time (chat, trajectory,
- * waterfall, …). Same shape as ui-trajectory's tab: pure consumer, no
- * service, no store; the registration rides the slot service's effect
- * wrapper, so plugin unload removes the tab.
+ * waterfall, …). Same shape as ui-trajectory's tab. The panel is now backed by
+ * the `requirements/*` Typert remote exported by `@auto-coding/cm-flow`
+ * (mounted here through `ctx.remote.$mount`), so its checklist lives in the
+ * `cm` database instead of component memory.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ThemeRuntime, ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
@@ -15,9 +16,21 @@ import './semi-css.ts'
 // owning package) must be in the program for the register call to type.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { RequirementsPanel } from './RequirementsPanel.tsx'
+import {
+  CONTRIBUTION,
+  attach,
+  detach,
+  type ProjectsRemote,
+  type QuestionsRemote,
+  type RequirementsRemote,
+} from './remote.ts'
 
-/** Required services: the slots registry (provided by dsh-client-runtime). */
-export const inject = ['slots']
+/** Required services: slots registry + the client `remote` bridge. */
+export const inject = ['slots', 'remote']
+
+interface RemoteHost {
+  $mount(contribution: unknown): Promise<() => Promise<void>>
+}
 
 /**
  * Keep Semi Design's palette in step with the shell theme. Semi's switch is
@@ -42,11 +55,38 @@ function syncSemiThemeMode(ctx: Context): void {
 }
 
 /**
- * Client plugin body: register the 需求面板 view tab.
- * @param ctx - client root context.
+ * Client plugin body: mount the requirements remote, then register the
+ * 需求面板 view tab. Mount failures degrade the panel to an error banner (the
+ * component surface it) rather than unmounting the tab.
  */
 export function apply(ctx: Context): void {
   syncSemiThemeMode(ctx)
+
+  const remote = ctx.get('remote') as RemoteHost | undefined
+  if (remote === undefined) {
+    detach(new Error('需求面板: 未检测到 remote 服务'))
+  } else {
+    let disposed = false
+    let disposeRemote: (() => Promise<void>) | undefined
+    void remote.$mount(CONTRIBUTION)
+      .then(async dispose => {
+        if (disposed) { await dispose(); return }
+        disposeRemote = dispose
+        const requirements = ctx.get('remote.requirements') as RequirementsRemote | undefined
+        const projects = ctx.get('remote.projects') as ProjectsRemote | undefined
+        const questions = ctx.get('remote.questions') as QuestionsRemote | undefined
+        if (requirements === undefined || projects === undefined || questions === undefined) {
+          throw new Error('需求面板: cm-flow remote 命名空间未完全挂载')
+        }
+        attach({ requirements, projects, questions })
+      })
+      .catch(error => { detach(error) })
+    ctx.effect(() => () => {
+      disposed = true
+      void disposeRemote?.()
+    }, 'ui-requirements: unmount requirements remote')
+  }
+
   ctx.slots.inject('conversation.view', () => ctx.slots.register(
     { name: 'conversation.view', id: 'requirements', order: 15, label: '需求面板' },
     RequirementsPanel,

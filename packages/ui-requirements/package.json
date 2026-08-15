@@ -30,7 +30,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@douyinfe/semi-ui": "^2.102.0"
+    "@douyinfe/semi-ui": "^2.102.0",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

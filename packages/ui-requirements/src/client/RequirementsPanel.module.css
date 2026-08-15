@@ -14,64 +14,225 @@
   padding: 16px 20px;
 }
 
-.addRow {
+/* ── top toolbar: counts + 添加需求 button ─────────────────────────────── */
+
+.toolbar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.input {
-  flex: 1;
-  min-width: 0;
-}
-
-.list {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0;
-  padding: 4px;
-  overflow: auto;
-  border: 1px solid var(--semi-color-border);
-  border-radius: 6px;
-  list-style: none;
-}
-
-.item {
+.toolbarInfo {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 36px;
-  padding: 2px 8px;
-  border-radius: 4px;
 }
 
-.item:hover {
-  background: var(--semi-color-fill-0);
-}
+/* ── centered spin / empty states ──────────────────────────────────────── */
 
-.item:hover .del {
-  opacity: 1;
-}
-
-.text {
-  flex: 1;
-  min-width: 0;
-}
-
-.del {
-  opacity: 0;
-}
-
-.emptyWrap {
+.center {
   display: flex;
   flex: 1;
   align-items: center;
   justify-content: center;
 }
 
+/* ── card grid ─────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  align-content: start;
+  overflow: auto;
+  padding: 2px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  background: var(--semi-color-bg-0);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--semi-color-primary-hover, #7bc5f6);
+  box-shadow: var(--semi-shadow-elevated);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardDesc {
+  margin: 0;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  border-top: 1px solid var(--semi-color-border, #e5e5e5);
+  padding-top: 8px;
+}
+
+/* ── footer hint ───────────────────────────────────────────────────────── */
+
 .foot {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ── error banner ──────────────────────────────────────────────────────── */
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--semi-color-danger, #e6024c);
+  border-radius: 6px;
+  background: var(--semi-color-danger-light-default, #fde8ef);
+}
+
+/* ── add-requirement modal form ────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formField label {
+  font-size: 13px;
+  color: var(--semi-color-text-2);
+}
+
+/* ── project bar & selector ────────────────────────────────────────────── */
+
+.projectBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.projectSelect {
+  width: 200px;
+}
+
+/* ── stage timeline ────────────────────────────────────────────────────── */
+
+.stageTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.stageRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.stageDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--semi-color-border);
+  flex-shrink: 0;
+}
+
+.stageDot.success {
+  background: var(--semi-color-success, #4cc38a);
+}
+
+.stageDot.failed {
+  background: var(--semi-color-danger, #e6024c);
+}
+
+.stageDot.waiting_reply {
+  background: var(--semi-color-warning, #f8a821);
+}
+
+.stageDot.running {
+  background: var(--semi-color-primary, #1677ff);
+}
+
+/* ── question modal ────────────────────────────────────────────────────── */
+
+.questionList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.questionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.questionText {
+  font-weight: 600;
+}
+
+.questionOptions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── project manager ───────────────────────────────────────────────────── */
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  margin-bottom: 16px;
+}
+
+.projectRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 6px;
+}
+
+.projectRowName {
+  font-weight: 600;
+}
+
+.projectRowPath {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
 }

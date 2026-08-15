@@ -1,0 +1,44 @@
+{
+  "name": "@auto-coding/cm-worker",
+  "description": "Host-only dsh plugin: coding-pipeline worker — poll scheduler, stage orchestration, records ledger, stage-session adapter (subagents)",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "types": "build/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "@auto-coding/cm-flow": "^0.1.0",
+    "@auto-coding/cm-worktree": "^0.1.0",
+    "@auto-coding/db-pgmas": "^0.1.0",
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-agent": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-subagent": "^0.1.0-rc.5",
+    "@deepseek-ai/schemastery": "^1.0.0"
+  },
+  "devDependencies": {
+    "@auto-coding/cm-flow": "link:/root/workspace/auto-coding-plugins/packages/cm-flow",
+    "@auto-coding/cm-worktree": "link:/root/workspace/auto-coding-plugins/packages/cm-worktree",
+    "@auto-coding/db-pgmas": "link:/root/workspace/auto-coding-plugins/packages/db-pgmas",
+    "@deepseek-ai/cordis": "link:/root/workspace/deepseek-harness/vendor/cordis",
+    "@deepseek-ai/dsh-agent": "link:/root/workspace/deepseek-harness/packages/core/agent",
+    "@deepseek-ai/dsh-subagent": "link:/root/workspace/deepseek-harness/packages/subagent/subagent",
+    "@deepseek-ai/schemastery": "link:/root/workspace/deepseek-harness/vendor/schemastery",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.21.0",
+    "pg": "^8.23.0",
+    "tsdown": "^0.22.2"
+  },
+  "files": [
+    "lib",
+    "build",
+    "src",
+    "package.json"
+  ]
+}

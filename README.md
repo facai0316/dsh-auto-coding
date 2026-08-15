@@ -1,5 +1,8 @@
 # auto-coding-plugins
 
+> 📌 **跨会话进度看这里：[`docs/PROGRESS.md`](docs/PROGRESS.md)** —— 完成/未完成状态、
+> 重启与端到端走查清单、环境速查。继续工作前先读它。
+
 Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一个插件包，构建产物可挂载进任意 dsh 部署的 profile。
 
 首个包 `@auto-coding/ui-hello` 是界面类插件的最小可运行样板：在 Web GUI 侧边栏脚部（`sidebar.footer.action`，list 型 Slot、零替换风险）注册一个自包含的计数按钮。
@@ -16,16 +19,45 @@ Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一�
 │   └── tsdown.client.ts    # 共享打包 preset：Node 半 + 浏览器半（见下）
 └── packages/
     ├── ui-hello/           # @auto-coding/ui-hello：侧边栏脚部按钮（list Slot 样板）
-    └── ui-requirements/    # @auto-coding/ui-requirements：顶部会话视图 tab「需求面板」
-        │                   #   conversation.view（list Slot，与 chat/trajectory 同环），
-        │                   #   面板为内存态需求清单（添加/勾选/删除）
-        └── …
-        ├── package.json    # exports + dsh.client 声明 + peer 依赖
-        ├── tsdown.config.ts
-        ├── src/
-        │   ├── index.ts            # Node 半（host Loader 从 cordis.yml 行导入）
-        │   └── client/             # 浏览器半（Slot UI + CSS Module）
-        └── tests/
+    ├── ui-requirements/    # @auto-coding/ui-requirements：顶部会话视图 tab「需求面板」
+    │   │                   #   conversation.view（list Slot，与 chat/trajectory 同环），
+    │   │                   #   面板为内存态需求清单（添加/勾选/删除）
+    │   └── …
+    │       ├── package.json    # exports + dsh.client 声明 + peer 依赖
+    │       ├── tsdown.config.ts
+    │       ├── src/
+    │       │   ├── index.ts            # Node 半（host Loader 从 cordis.yml 行导入）
+    │       │   └── client/             # 浏览器半（Slot UI + CSS Module）
+    │       └── tests/
+    └── db-pgmas/           # @auto-coding/db-pgmas：host-only 工具插件（无浏览器半）——
+                            #   本机 pg-mas PostgreSQL 16 docker 实例连接：
+                            #   `pgmas` 服务（连接池 + query/目录内省 + 服务级写缝 withClient）+
+                            #   pg_query / pg_schema 模型工具（全局注册，所有会话可见）+
+                            #   `tool:pg-mas` 提示段（order 107）。
+                            #   连接默认值（127.0.0.1:25678，user/db mas，库 mas/cm/facai，
+                            #   默认只读守卫）在 src/index.ts 的 Config 里，行 config 可覆盖。
+                            #
+    └── cm-flow/            # @auto-coding/cm-flow：host-only 业务插件（无浏览器半）——
+                            #   `cm` 库需求持久化 + 状态机，经 Typert Remote 暴露
+                            #   `requirements` / `projects` / `questions` 三个命名空间。
+                            #   domain/repo 在 src/repo.ts（无装饰器，可被 vitest/esbuild 直接测）；
+                            #   src/index.ts 是 TypertRemoteService 壳（@Remote 装饰器）。
+                            #   构建为两步：tsc 降级装饰器到 build/ → tsdown bundle 到 lib/
+                            #   （rolldown 直转不会降级 TC39 装饰器，故不能单步 tsdown）。
+                            #   schema 演进：_cm_flow_migrations 顺序迁移（v1 baseline、
+                            #   v2 projects、v3 requirements.project_id、v4 ask_user_questions）；
+                            #   固定 userId（Config 可覆盖）首次激活幂等植入 users 行（FK 目标）。
+                            #
+    └── cm-worktree/        # @auto-coding/cm-worktree：纯 Node git worktree 生命周期封装——
+                            #   每任务一分支一 worktree（create/push/remove/isMerged/target 软链），
+                            #   零 dsh 依赖，可对临时 git 仓库单测。
+                            #
+    └── cm-worker/          # @auto-coding/cm-worker：编码流水线 worker（host-only）——
+                            #   timer 串行轮询：领取 open 需求 → 6 阶段 subagent 会话
+                            #   （facai-* skill 注入，cwd=worktree）→ records 记账 →
+                            #   决策续跑（waiting_reply）→ merge PR agent 任务 → 收尾清理。
+                            #   编排逻辑在 src/pipeline.ts（纯依赖注入，可测）；
+                            #   src/index.ts 是 cordis 服务壳（真实 subagents/agents/fs/worktree）。
 ```
 
 ## 常用命令
@@ -112,3 +144,19 @@ mkdir -p packages/<name>/src/client packages/<name>/tests
 # 复制 ui-hello 的 package.json / tsconfig.json / tsdown.config.ts 改名，
 # tsdown.config.ts 里换成新包名；根目录 pnpm install 后即可 build。
 ```
+
+# host-only 工具插件（以 db-pgmas 为样板）
+
+无浏览器半的插件不需要 `dsh.client` 声明和 `lib/client.js`，只要 `exports["."] → lib/index.js`。
+宿主半导出 `{ name, inject, Config, apply(ctx, config) }`：
+
+- `inject: ['tools', 'systemPrompt']` 等注册表服务是硬依赖（dsh-base 在 profile 根提供）；
+- `ctx.tools.register(defineTool({...}))` 从 profile 根注册即**全局工具**，对每个 agent 会话可见；
+- `Config`（schemastery，Standard Schema V1）做行 config 校验，全字段可带默认值（行内 `config: {}` 也行）；
+- `ctx.provide('<service>', impl)` 暴露服务给其他插件，fiber 卸载时自动撤回；连接池等外部资源用
+  `ctx.effect(() => () => cleanup)` 归还；
+- tsdown 产物名固定 `lib/index.js`/`.d.ts`（`outExtensions`），`@deepseek-ai/*` 与 `pg` 等运行时依赖
+  一律 external，由 node_modules 解析。
+
+挂载方式与 UI 插件相同（`link:` 符号链接 + `cordis.patch.yml` 的 `insert` 行）；行的新增/删除经
+patch 层 watcher **热生效**，无需重启 `dsh web`，且重启后依然常驻。

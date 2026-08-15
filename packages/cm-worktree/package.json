@@ -1,0 +1,25 @@
+{
+  "name": "@auto-coding/cm-worktree",
+  "description": "Pure-Node git worktree lifecycle manager for the coding pipeline (create/push/remove/isMerged/shared target), no dsh dependency",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsdown": "^0.22.2"
+  },
+  "files": [
+    "lib",
+    "src",
+    "package.json"
+  ]
+}
