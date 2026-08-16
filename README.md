@@ -20,13 +20,21 @@ Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一�
 └── packages/
     ├── ui-hello/           # @auto-coding/ui-hello：侧边栏脚部按钮（list Slot 样板）
     ├── ui-requirements/    # @auto-coding/ui-requirements：顶部会话视图 tab「需求面板」
-    │   │                   #   conversation.view（list Slot，与 chat/trajectory 同环），
-    │   │                   #   面板为内存态需求清单（添加/勾选/删除）
+    │   │                   #   conversation.view（list Slot，与 chat/trajectory 同环）。
+    │   │                   #   看板内部 tab：审核 / 项目 / 需求 / 运行 / 配置 / 使用说明。
+    │   │                   #   「配置」页含数据库连接卡片（pg 链接编辑 + 试连 + 保存）；
+    │   │                   #   「使用说明」页渲染 markdown 文档。
+    │   │                   #   host 半（Typert Remote）：
+    │   │                   #   pgconfig —— 读写用户层 cordis.patch.yml 的 db-pgmas
+    │   │                   #   override（patch watcher 热生效，无需重启）+ 试连；
+    │   │                   #   usage —— 返回使用说明 markdown（占位或 usagePath 文件）。
     │   └── …
     │       ├── package.json    # exports + dsh.client 声明 + peer 依赖
-    │       ├── tsdown.config.ts
+    │       ├── tsdown.config.ts   # 双端：host 两阶段（tsc 降装饰器 → tsdown）+ client preset
+    │       ├── tsconfig.build.json # host 半 tsc 阶段（@Remote 装饰器降级）
     │       ├── src/
-    │       │   ├── index.ts            # Node 半（host Loader 从 cordis.yml 行导入）
+    │       │   ├── index.ts            # Node 半（Typert Remote + host Loader 导入）
+    │       │   ├── patch-utils.ts      # 无装饰器的 patch 读写/校验（可被 vitest 直测）
     │       │   └── client/             # 浏览器半（Slot UI + CSS Module）
     │       └── tests/
     └── db-pgmas/           # @auto-coding/db-pgmas：host-only 工具插件（无浏览器半）——
@@ -58,6 +66,12 @@ Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一�
                             #   决策续跑（waiting_reply）→ merge PR agent 任务 → 收尾清理。
                             #   编排逻辑在 src/pipeline.ts（纯依赖注入，可测）；
                             #   src/index.ts 是 cordis 服务壳（真实 subagents/agents/fs/worktree）。
+    └── mega/               # @auto-coding/mega：**可分发的单包**（计划 10）——
+                            #   db/flow/worker/index 四 host 入口 + client 浏览器半 +
+                            #   `dsh.bundle` 包内 patch + `dsh.client` 声明 + assets/skills。
+                            #   一条 `dsh plugin add …&path:/dist/mega` 即挂载全部四行
+                            #   （reconcile 自动进 bundles，patch 自动挂载）；
+                            #   发布产物由 `scripts/build-dist.mjs` 组装到 `dist/mega/`。
 ```
 
 ## 常用命令

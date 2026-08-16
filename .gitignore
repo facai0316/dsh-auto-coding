@@ -4,3 +4,4 @@ lib/
 .npm-cache/
 .pnpm-store/
 .DS_Store
+dist/

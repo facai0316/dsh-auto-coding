@@ -1,0 +1,19 @@
+# @auto-coding/mega bundle patch: the four pipeline rows, mounted as ONE
+# package. Rows keep the original ids so a user-layer `- id: db-pgmas config:`
+# override (e.g. written by the panel's 数据库连接 card) still wins by id;
+# only the `name` changes from the old per-package entries to mega subpaths.
+- insert:
+    - id: db-pgmas
+      name: '@auto-coding/mega/db'
+      config: {}
+- insert:
+    - id: cm-flow
+      name: '@auto-coding/mega/flow'
+      config: {}
+- insert:
+    - id: cm-worker
+      name: '@auto-coding/mega/worker'
+      config: {}
+- insert:
+    - id: ui-requirements
+      name: '@auto-coding/mega'

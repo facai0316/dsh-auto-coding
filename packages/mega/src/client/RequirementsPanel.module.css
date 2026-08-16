@@ -1,0 +1,525 @@
+/*
+ * 需求面板 layout shell. Visual skin comes from Semi Design
+ * (semi.min.css, injected by the tsdown preset); this module only places
+ * the blocks inside the conversation view body.
+ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 16px 20px;
+}
+
+/* ── top toolbar: counts + 添加需求 button ─────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.toolbarInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 顶部导航栏（项目 / 需求 / 运行） ─────────────────────────────────── */
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--semi-color-border, #e5e5e5);
+}
+
+.navTabs {
+  display: flex;
+  gap: 4px;
+}
+
+.navTab {
+  border: none;
+  background: transparent;
+  padding: 6px 16px;
+  font-size: 14px;
+  color: var(--semi-color-text-2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.navTab:hover {
+  background: var(--semi-color-fill-0, #f2f3f5);
+  color: var(--semi-color-text-0);
+}
+
+.navTabActive {
+  background: var(--semi-color-primary-light-default, #e8f3ff);
+  color: var(--semi-color-primary, #1677ff);
+  font-weight: 600;
+}
+
+/* ── 审核 tab 待办角标 ─────────────────────────────────────────────────── */
+
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--semi-color-danger, #e6024c);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  vertical-align: 1px;
+}
+
+/* ── 审核大厅：分区标题 / 纵向列表 ────────────────────────────────────── */
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--semi-color-border, #e5e5e5);
+}
+
+.reviewList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── 配置页：行布局 / 时段选择器 ──────────────────────────────────────── */
+
+.formRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.configSelect {
+  width: 280px;
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── 页面主体（grid 或空态） ──────────────────────────────────────────── */
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+}
+
+/* ── 运行页筛选栏 ─────────────────────────────────────────────────────── */
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterSelect {
+  width: 180px;
+}
+
+/* ── 运行页分页器 ───────────────────────────────────────────────────────── */
+
+.pager {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+/* ── 卡片 meta 行（项目卡片） ─────────────────────────────────────────── */
+
+.metaRows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metaLabel {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+  flex-shrink: 0;
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ── centered spin / empty states ──────────────────────────────────────── */
+
+.center {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── card grid ─────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fill, minmax(345px, 1fr));
+  gap: 12px;
+  align-content: start;
+  overflow: auto;
+  padding: 2px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 8px;
+  background: var(--semi-color-bg-0);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.card:hover {
+  border-color: var(--semi-color-primary-hover, #7bc5f6);
+  box-shadow: var(--semi-shadow-elevated);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardDesc {
+  margin: 0;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  border-top: 1px solid var(--semi-color-border, #e5e5e5);
+  padding-top: 8px;
+}
+
+/* ── footer hint ───────────────────────────────────────────────────────── */
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── error banner ──────────────────────────────────────────────────────── */
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--semi-color-danger, #e6024c);
+  border-radius: 6px;
+  background: var(--semi-color-danger-light-default, #fde8ef);
+}
+
+/* ── add-requirement modal form ────────────────────────────────────────── */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formField label {
+  font-size: 13px;
+  color: var(--semi-color-text-2);
+}
+
+/* ── project bar & selector ────────────────────────────────────────────── */
+
+.projectBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.projectSelect {
+  width: 200px;
+}
+
+/* ── stage timeline ────────────────────────────────────────────────────── */
+
+.stageTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.stageRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+
+.stageDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--semi-color-border);
+  flex-shrink: 0;
+}
+
+.stageDot.success {
+  background: var(--semi-color-success, #4cc38a);
+}
+
+.stageDot.failed {
+  background: var(--semi-color-danger, #e6024c);
+}
+
+.stageDot.waiting_reply {
+  background: var(--semi-color-warning, #f8a821);
+}
+
+.stageDot.waiting_review {
+  background: var(--semi-color-warning, #f8a821);
+  animation: stageDotPulse 1.2s ease-in-out infinite;
+}
+
+.stageDot.retrying {
+  background: var(--semi-color-warning, #f8a821);
+  animation: stageDotPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes stageDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.stageDot.running {
+  background: var(--semi-color-primary, #1677ff);
+}
+
+/* ── question modal ────────────────────────────────────────────────────── */
+
+.questionList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.questionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.questionText {
+  font-weight: 600;
+}
+
+.questionOptions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── 审核大厅：整改意见输入 / 审核操作 ─────────────────────────────────── */
+
+.reviewFeedback {
+  width: 100%;
+}
+
+.reviewActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--semi-color-border, #e5e5e5);
+  padding-top: 8px;
+}
+
+/* ── project manager ───────────────────────────────────────────────────── */
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  margin-bottom: 16px;
+}
+
+.projectRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--semi-color-border);
+  border-radius: 6px;
+}
+
+.projectRowName {
+  font-weight: 600;
+}
+
+.projectRowPath {
+  font-size: 12px;
+  color: var(--semi-color-text-2);
+}
+/* ── 配置页反馈 / 使用说明 markdown 正文 ───────────────────────────────── */
+
+.feedback {
+  padding: 4px 0;
+}
+
+.markdownBody {
+  line-height: 1.7;
+  font-size: 14px;
+  color: var(--semi-color-text-0);
+  overflow-wrap: break-word;
+  max-width: 860px;
+}
+
+.markdownBody h1,
+.markdownBody h2,
+.markdownBody h3,
+.markdownBody h4 {
+  margin: 16px 0 8px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.markdownBody h1 {
+  font-size: 22px;
+  border-bottom: 1px solid var(--semi-color-border);
+  padding-bottom: 6px;
+}
+
+.markdownBody h2 {
+  font-size: 18px;
+}
+
+.markdownBody h3 {
+  font-size: 15px;
+}
+
+.markdownBody p {
+  margin: 8px 0;
+}
+
+.markdownBody ul,
+.markdownBody ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.markdownBody li {
+  margin: 4px 0;
+}
+
+.markdownBody code {
+  background: var(--semi-color-fill-0);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.markdownBody pre {
+  background: var(--semi-color-fill-1);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+
+.markdownBody pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdownBody blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--semi-color-primary);
+  color: var(--semi-color-text-2);
+}
+
+.markdownBody a {
+  color: var(--semi-color-primary);
+  text-decoration: none;
+}
+
+.markdownBody a:hover {
+  text-decoration: underline;
+}
+
+.markdownBody table {
+  border-collapse: collapse;
+  margin: 8px 0;
+}
+
+.markdownBody th,
+.markdownBody td {
+  border: 1px solid var(--semi-color-border);
+  padding: 4px 8px;
+}
