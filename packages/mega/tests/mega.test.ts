@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseDocument } from 'yaml'
-import { validatePgConfig } from '../src/patch-utils.ts'
+import { upsertRowConfigInText, validatePgConfig } from '../src/patch-utils.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -44,6 +44,27 @@ describe('@auto-coding/mega shared host helpers', () => {
 
   it('rejects a bad port', () => {
     expect(validatePgConfig({ host: 'h', port: 70000, user: 'u', database: 'd' })).toContain('port')
+  })
+
+  it('saving the db-pgmas override keeps !!js expressions in other rows', () => {
+    const next = upsertRowConfigInText(
+      `- id: webserver
+  config:
+    port: !!js ctx.webStartup.port ?? 3080
+- id: db-pgmas
+  config:
+    host: 127.0.0.1
+    port: 25678
+`,
+      'db-pgmas',
+      { host: '10.0.0.5', port: 5433, user: 'u', database: 'd' },
+    )
+    // Regression: a parse→JS→stringify round-trip stripped the `!!js` tag.
+    expect(next).toContain('!!js ctx.webStartup.port ?? 3080')
+    expect(parsePatchText(next).find(row => (row as { id?: string }).id === 'db-pgmas')).toMatchObject({
+      id: 'db-pgmas',
+      config: { host: '10.0.0.5', port: 5433, user: 'u', database: 'd' },
+    })
   })
 })
 

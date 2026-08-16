@@ -29,13 +29,13 @@ import {
   mergedConfig,
   parsePatchFile,
   resolvePatchPath,
-  serializePatch,
+  upsertRowConfigInText,
   validatePgConfig,
   type Config,
 } from './patch-utils.ts'
 
 export type { Config } from './patch-utils.ts'
-export { findRowConfig, validatePgConfig, PG_DEFAULTS } from './patch-utils.ts'
+export { findRowConfig, upsertRowConfigInText, validatePgConfig, PG_DEFAULTS } from './patch-utils.ts'
 
 export const name = 'ui-requirements'
 
@@ -78,21 +78,18 @@ export class PgConfigRemote extends TypertRemoteService {
     const config = value as Record<string, unknown>
     const file = this.patchPath()
     try {
-      let items: unknown[]
+      let text = ''
       try {
-        items = parsePatchFile(file)
+        text = readFileSync(file, 'utf8')
       } catch {
-        items = []
+        // Missing patch file: start from an empty list (upsert appends the row).
       }
-      // Replace an existing top-level override for this row id, else append.
-      const rowId = this.config.dbRowId ?? 'db-pgmas'
-      const overrideIndex = items.findIndex(item =>
-        (item as Record<string, unknown> | null)?.id === rowId
-        && !Array.isArray((item as Record<string, unknown>).insert))
-      const override: Record<string, unknown> = { id: rowId, config }
-      if (overrideIndex >= 0) items[overrideIndex] = override
-      else items.push(override)
-      writeFileSync(file, serializePatch(items), 'utf8')
+      // Surgical AST edit, never a parse→JS→stringify round-trip: the latter
+      // silently strips `!!js` from every other row in the file (e.g. the
+      // webserver port line), breaking the next restart. An unparseable file is
+      // reported instead of being clobbered.
+      const next = upsertRowConfigInText(text, this.config.dbRowId ?? 'db-pgmas', config)
+      writeFileSync(file, next, 'utf8')
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
       return { ok: false, error: `写入 ${file} 失败: ${message}`, patchPath: file }

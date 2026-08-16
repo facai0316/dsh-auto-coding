@@ -8,7 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { parseDocument, stringify } from 'yaml'
+import { isMap, isPair, isScalar, isSeq, parseDocument } from 'yaml'
 
 export interface Config {
   /** dsh profile whose `cordis.patch.yml` holds the db-pgmas row. */
@@ -76,8 +76,44 @@ export function parsePatchFile(file: string): unknown[] {
   return Array.isArray(items) ? items : []
 }
 
-export function serializePatch(items: unknown[]): string {
-  return stringify(items)
+/**
+ * Surgically rewrite a user-layer patch file's text so the row `rowId` carries
+ * `config`, preserving every OTHER node verbatim — `!!js` tagged expressions,
+ * comments, and key order. Editing the parsed Document AST instead of
+ * round-tripping through plain JS objects is what keeps `!!js` alive: yaml's
+ * `toJS()` resolves a tagged scalar to its plain string, so a parse→JS→stringify
+ * cycle would silently strip the tag and turn
+ * `port: !!js ctx.webStartup.port ?? 3080` into a literal string the Loader can
+ * no longer evaluate (the webserver then fails to bind → boot failure).
+ *
+ * Mirrors the previous `{ id, config }` replace-or-append semantics: a top-level
+ * row (a map whose `id` matches, excluding `insert` rows) gets its `config`
+ * value replaced or added; otherwise a new `{ id, config }` row is appended.
+ *
+ * @throws if the text is not parseable as a YAML sequence.
+ */
+export function upsertRowConfigInText(text: string, rowId: string, config: Record<string, unknown>): string {
+  const doc = parseDocument(text.length > 0 ? text : '[]')
+  if (doc.errors.length > 0) throw new Error(`patch parse error: ${doc.errors[0].message}`)
+  if (doc.contents === null) {
+    // Empty/comments-only file: plant an empty root sequence. `createNode`
+    // returns an unparsed node while a parsed document types contents as
+    // ParsedNode, so widen the assignment explicitly (runtime accepts any node).
+    doc.contents = doc.createNode([]) as never
+  }
+  if (!isSeq(doc.contents)) throw new Error('patch root must be a YAML list')
+  const items = doc.contents.items
+  const keyIs = (pair: unknown, key: string): boolean => isPair(pair) && isScalar(pair.key) && pair.key.value === key
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index]
+    if (!isMap(item) || item.items.some(pair => keyIs(pair, 'insert'))) continue
+    const idPair = item.items.find(pair => keyIs(pair, 'id'))
+    if (!idPair || !isScalar(idPair.value) || idPair.value.value !== rowId) continue
+    doc.setIn([index, 'config'], config)
+    return doc.toString()
+  }
+  doc.addIn([], { id: rowId, config })
+  return doc.toString()
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
