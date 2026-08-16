@@ -28,10 +28,10 @@ mkdirSync(dist, { recursive: true })
 cpSync(join(src, 'lib'), join(dist, 'lib'), { recursive: true })
 // The bundle patch: mounting the four rows is THE point of the mega package.
 cpSync(join(src, 'cordis.patch.yml'), join(dist, 'cordis.patch.yml'))
-// Builtin facai skills (P3 builtin source) + the packaged usage document.
-for (const asset of ['skills', 'USAGE.md']) {
-  const from = join(src, 'assets', asset)
-  if (exists(from)) cpSync(from, join(dist, 'assets', asset), { recursive: true })
+// The packaged usage document (the plugin ships NO skills — facai skills are
+// project-specific and must come from coding-pipline-skills or skillsSource).
+if (exists(join(src, 'assets', 'USAGE.md'))) {
+  cpSync(join(src, 'assets', 'USAGE.md'), join(dist, 'assets', 'USAGE.md'))
 }
 
 // The publishable manifest: exports/dsh declarations copied verbatim, but the

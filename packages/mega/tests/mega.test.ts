@@ -60,7 +60,8 @@ describe('@auto-coding/mega usage documentation', () => {
     expect(usage).toContain('coding-pipline-skills')
     expect(usage).toContain('添加项目')
     expect(usage).toContain('/facai-init')
-    // 内置 builtin 技能源 → 新项目免手动装技能。
-    expect(usage).toContain('builtin')
+    // 插件不内置 skills：文档必须引导用户配合外部技能包使用。
+    expect(usage).toContain('必须配合')
+    expect(usage).not.toContain('内置一套')
   })
 })

@@ -41,24 +41,22 @@ dsh plugin --profile web add "git+ssh://git@github.com/facai0316/dsh-auto-coding
 
 ## 第二步：把 coding-pipline-skills 放到工程目录
 
-本插件**不内置任何技能**——那套 facai skills 是项目/组织特定的（编码
-fac-ai-rs 的规则与流程），对别的项目没有意义，所以必须配合
-[coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
-使用。各阶段会话（decision / plan / coding / contract / review / selfcheck）
-读取项目下的 `.agents/skills/<skill>/SKILL.md` 技能文件：
+本插件的各阶段会话（decision / plan / coding / contract / review / selfcheck）
+会读取项目下的 `.agents/skills/<skill>/SKILL.md` 技能文件。两种方式：
 
-1. 把 [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
-   拉到本地；
-2. 将其 `.agents/skills/` 内容复制到你的项目根目录下
-   （`<项目>/.agents/skills/…`）；
-3. 让 agent 运行 `/facai-init` 技能，生成项目专属的 `ARCHITECTURE.md`、
-   编码/测试规则、契约映射与 `pipeline.config.yaml`（详细用法见其
-   [GitHub 主页](https://github.com/facai0316/coding-pipline-skills)）。
+- **推荐（开箱即用）**：worker 已内置一套 facai skills（`builtin` 源），
+  建 worktree 时自动补进 `.agents/skills/`，**无需手动安装技能**；
+- **项目级定制**：把 [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
+  拉到本地，将其 `.agents/skills/` 内容复制到你的项目根目录下
+  （`<项目>/.agents/skills/…`），项目自身的技能优先于内置源。
 
-> 进阶（可选）：worker 行配置 `skillsSource` 可指向**外部技能仓库**
-> （`dir`（绝对路径）| `git`（url + ref）），流水线缺技能时从那里补装；
-> 不配置则只读项目自身的 `.agents/skills/`（缺了会明确报错提示先跑
-> facai-init）。见 `docs/plans/10`。
+coding-pipline-skills 的详细使用方法见其
+[GitHub 主页](https://github.com/facai0316/coding-pipline-skills)：
+把仓库拉到本地，然后让 agent 运行 `/facai-init` 技能，即可生成项目专属的
+`ARCHITECTURE.md`、编码/测试规则、契约映射与 `pipeline.config.yaml`。
+
+> 进阶：worker 行配置 `skillsSource` 可切换技能来源
+> （`builtin`（默认）| `dir`（绝对路径）| `git`（url + ref）），见 `docs/plans/10`。
 
 ---
 
@@ -83,7 +81,7 @@ worker 自动领取并跑流水线：
 
 1. `decision` 产出方案（会先问你要不要人审/要不要回答问题）；
 2. `plan` 生成计划 → `review-plan` 机审 → 人审门；
-3. `coding` 在任务分支 worktree 里编码（读取项目 `.agents/skills/`）；
+3. `coding` 在任务分支 worktree 里编码（内置 `builtin` 技能）；
 4. `contract` / `review-code` 校验；
 5. `merge` 推送分支 + 建 PR → 你在 Gitee/GitHub 合并后，审核大厅点「已合并」收尾。
 
@@ -97,7 +95,6 @@ worker 自动领取并跑流水线：
 - **连接失败**：确认 host/port/user/password/database 正确，测试连接按钮会给出原因。
 - **迁移报错**：通常是连接库不对（应指向包含 `cm` 库的实例）或权限不足；改完连接后
   重新点「迁移（建表）」。
-- **技能不存在**：插件不内置技能——把 [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
-  的 `.agents/skills/` 放进项目（或配置 `skillsSource` 指向外部技能仓库）后重试；
-  报错信息会指出缺失的技能与路径。
+- **技能不存在**：确认项目 `.agents/skills/` 存在（或依赖内置 builtin 源）；未配置
+  外部源时 worker 会自动使用包内技能。
 - **面板 remote 报错**：host 半代码变更后需重启 `dsh web` 生效（client 半走 HMR 免重启）。

@@ -17,11 +17,11 @@ Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一�
 1. **配置数据库**：打开「自动化看板 → 配置」页，填好 pg 连接参数 →「测试连接」
    →「保存并应用」（热生效，无需重启）→ 点 **「迁移（建表）」** 补齐 `cm` 库 schema
    （迁移在 cm-flow 首次挂载时也会自动跑，按钮用于主动跑一遍看结果）。
-2. **准备技能**：worker 已内置 facai skills（`builtin` 源，建 worktree 时自动装进
-   `.agents/skills/`，新项目开箱即用）；如需项目级定制，把
-   [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
+2. **准备技能**：插件**不内置任何技能**（facai skills 是项目/组织特定的）——
+   把 [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
    拉到本地，将其 `.agents/skills/` 复制到项目根目录，再让 agent 运行 `/facai-init`
-   技能生成项目配置（详细用法见其 GitHub 主页）。
+   技能生成项目配置（详细用法见其 GitHub 主页）。可选：worker 行配置
+   `skillsSource`（`dir` | `git`）指向外部技能仓库。
 3. **添加项目**：「自动化看板 → 项目」页「新增」：名称 / 本地路径 / Git 地址 / 平台 / PR Token。
 4. **登记需求**：「需求」页「新增」并「开始执行」，worker 自动跑完整流水线，
    审核大厅处理 待审核 / 待决策 / 待合并。

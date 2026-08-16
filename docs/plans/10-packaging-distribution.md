@@ -4,8 +4,9 @@
 > 目标：把这套 out-of-tree 插件**打包成一个可分发的包**，装到任意 dsh 部署
 > （本机、其他电脑、服务器），并走 **dsh 自带的插件安装机制**（`dsh plugin add`）
 > 实现一键安装。
-> 状态：**方案已定稿**（2026-08-16 讨论确定四项决策）；P0–P3 已实施并验证
-> （2026-08-16 会话），待本机 profile 切换与远端分发实测（见 §7 待办）。
+> 状态：**方案已定稿**（2026-08-16 讨论确定四项决策，决策 4 同日修订为
+> 「不内置技能」）；P0–P3 已实施并验证（2026-08-16 会话），待本机 profile
+> 切换与远端分发实测（见 §7 待办）。
 
 ## 0. 结论速览（四项已定决策）
 
@@ -14,7 +15,7 @@
 | 1 | 打包粒度 | **单 mega 包多入口** | 4 个插件本质是一条流水线的四个环节，一套版本号天然同步；依赖从跨包 peerDeps 变包内模块 |
 | 2 | 分发通道 | **私有 git 依赖** | 不用 registry；pnpm `git+ssh` 克隆即装；仓库私有则凭据不泄露 |
 | 3 | 配置保存位置 | **写回用户层 cordis.patch.yml** | 与部署模型一致、热生效、升级不覆盖（已有「数据库连接」卡片落地） |
-| 4 | skills 来源 | **可配置外部路径**（dir / git / builtin） | 灵活，缺省回退包内 assets/skills/ |
+| 4 | skills 来源 | **可配置外部路径**（dir / git；**不内置**） | 必须配合外部技能包（facai skills 是项目特定） |
 
 ---
 
@@ -93,7 +94,7 @@ packages/mega/
     worker.ts             # ← cm-worker（host-only，timer 流水线 + merge remote）
     client/index.ts       # ← ui-requirements 浏览器半（看板 tab + 数据库连接卡片 + 使用说明页）
   assets/
-    skills/               # 内置 facai skills 兜底（决策 4 的 builtin 来源）
+    skills/（已移除——不内置技能；外部技能仓库经 skillsSource 配置）
 ```
 
 ### 3.2 exports / 声明
@@ -211,24 +212,30 @@ dsh --profile web
 
 ---
 
-## 6. skills 外部源（决策 4）
+## 6. skills 外部源（决策 4，2026-08-16 修订）
 
 cm-worker 各阶段读 `项目/.agents/skills/<skill>/SKILL.md`，找不到报
-「需先跑 facai-init」。方案：
+「需先跑 facai-init」。**修订：插件不内置任何技能**——facai skills 是
+项目/组织特定的（编码 fac-ai-rs 的规则），对其他项目没有意义，必须配合
+[coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
+使用（把其 `.agents/skills/` 放进项目 + 运行 `/facai-init`）。可选的
+**外部技能仓库**兜底：
 
 ```yaml
-# mega 行 config 新增
+# mega 行 config 新增（可选；不配置 = 只读项目自身 .agents/skills/）
 config:
   skillsSource:
-    kind: builtin   # builtin | dir | git
-    # kind=dir  时:  path: /abs/path/to/skills
-    # kind=git  时:  url: git@…/facai-skills.git, ref: v1
+    kind: dir   # dir | git
+    # kind=dir 时: path: /abs/path/to/skills
+    # kind=git 时: url: git@…/facai-skills.git, ref: v1
 ```
 
-- cm-worker 创建 worktree 时按 `skillsSource` 把一套 facai skills
-  （init/plan/coding/decision/review/selfcheck/contract）装进 `.agents/skills/`；
-- `builtin` 回退到 mega 包 `assets/skills/`（决策 1 目录结构里已预留）；
-- 新项目「开箱即用」，不用先跑 facai-init。
+- cm-worker 读取顺序：项目自身 `.agents/skills/<skill>/SKILL.md`（优先）→
+  配置的 `skillsSource`（dir | git）；
+- `skillsSource` 配置后，创建 worktree 时把缺的技能从外部源补进
+  `.agents/skills/`（provisionSkills 钩子）；
+- 未配置 `skillsSource` 且项目缺技能 → 明确报错提示先跑 facai-init（旧配置的
+  `builtin` 被当作「无外部源」退化处理）。
 
 ---
 
@@ -239,7 +246,7 @@ config:
 | **P0** | mega 包骨架：db/flow/worker/client 四入口合并 + exports + `dsh.bundle` 声明 + 包内 patch；本机 `dsh plugin add link:…` 走通 reconcile | 本机跑通、patch 自动挂载 | ✅ 已验证 |
 | **P1** | ① client 半挂载语义验证（§3.4，解法 1 兜底）；② git 分发产物策略定案（§4.2，方案 B 已定）；③ 干净环境模拟 `dsh plugin add git+…` | 目标机器可一键安装 | ✅ ①③已验证，②已定案 |
 | **P2** | 配置界面（数据库连接卡片已落地；核对 mega 行 id 一致；如需再加 worker 时段/模型配置入口） | GUI 改配置热生效 | ✅ 行 id 已断言一致 |
-| **P3** | skills 外部源 + 内置兜底（§6） | 新项目开箱即用 | ✅ 已实现+测试 |
+| **P3** | skills 外部源（§6，修订：不内置技能，必须配合外部技能包） | 项目缺技能时报错提示 | ✅ 已实现+测试 |
 
 **当前进度**：P2 的「数据库连接」卡片已在 ui-requirements 实现并通过测试；
 P0/P1/P3 已实施并验证（2026-08-16）：
@@ -259,18 +266,19 @@ P0/P1/P3 已实施并验证（2026-08-16）：
   `@auto-coding/mega`（ui-requirements 行）解析到 package.json、读到 `dsh.client`
   并取 `exports["./client"]` → lib/client.js。**解法 2 天然成立，无需解法 1 兜底**。
 - **P1 ② 定案（§4.2）= 方案 B**：新增 `scripts/build-dist.mjs` 组装
-  `dist/mega/`（lib/ + cordis.patch.yml + assets/skills + 精简 manifest），
-  git 依赖指向子目录（`#v0.2.0&path:/dist/mega`）。pnpm 11.21 实测支持
+  `dist/mega/`（lib/ + cordis.patch.yml + assets/USAGE.md + 精简 manifest），
+  git 依赖指向子目录（`#v0.3.0&path:/dist/mega`）。pnpm 11.21 实测支持
   `&path:/` 子目录片段，安装**零构建**（无 prepare、无 allowBuilds）。
 - **P1 ③ 完成**：本地裸仓 + `dsh plugin add git+file://…&path:/dist/mega`
   在一次性 profile 全流程验证 —— 安装 → reconcile 进 bundles → dump-config
-  四行自动挂载 → 安装包内含 assets/skills（builtin 兜底源）。
-- **P3 完成**：`skills-source.ts`（builtin | dir | git 三源，git 按 url+ref
-  内容寻址缓存克隆）+ worker `skillsSource` 行 config + `readSkillMd` 回退
-  读取 + worktree 创建后 `provisionSkills` 补装缺失技能到
-  `.agents/skills/`（缺省 builtin → 包内 `assets/skills/`，新项目免 facai-init）；
-  assets/skills 已随包分发，`builtinSkillsRoot()` 经 import.meta.url 定位在
-  安装包内解析正确。
+  四行自动挂载。
+- **P3 完成（2026-08-16 修订：不内置技能）**：`skills-source.ts`（`dir` | `git`
+  两源，git 按 url+ref 内容寻址缓存克隆；`builtin` 已移除）+ worker
+  `skillsSource` 行 config + `readSkillMd` 回退 + worktree 创建后
+  `provisionSkills` 补装缺失技能到 `.agents/skills/`。**插件不打包任何 skills**
+  ——facai skills 是项目/组织特定（编码 fac-ai-rs 规则），必须配合
+  coding-pipline-skills 使用（把 `.agents/skills/` 放进项目 + 运行
+  `/facai-init`）；未配置 skillsSource 时只读项目自身技能，缺失即报错提示。
 
 **待办（非阻塞）**：① 本机 web profile 从四独立包切换到 mega（改
 `cordis.patch.yml` 删四行 insert + `dsh plugin add` mega + 重启，见

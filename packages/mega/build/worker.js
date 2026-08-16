@@ -50,7 +50,6 @@ import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { randomUUID } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { SkillSource, normalizeSkillsSource } from "./skills-source.js";
 import { DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, ProjectsRepo, QuestionsRepo, RequirementsRepo, ReviewsRepo, WorkerConfigRepo, } from "./flow-repo.js";
 import { WorktreeManager } from "./worktree.js";
@@ -61,10 +60,6 @@ export const DEFAULT_POLL_MS = 10_000;
 export const DEFAULT_STAGE_TIMEOUT_MS = 30 * 60_000;
 export const DEFAULT_MAX_RETRIES = 10;
 export const DEFAULT_SUBAGENT_PROVIDER = 'spawn';
-/** 包内 assets/skills 的绝对路径（builtin 兜底源；经 import.meta.url 定位，随打包存活）。 */
-function builtinSkillsRoot() {
-    return fileURLToPath(new URL('../assets/skills/', import.meta.url));
-}
 /** 阶段会话统一结构化输出契约（ObjectJsonSchema，subagent outputSchema 用）。 */
 export const STAGE_RESULT_SCHEMA = {
     type: 'object',
@@ -219,7 +214,8 @@ export default class CmWorkerService extends Service {
         stageTimeoutMs: z.number().min(10_000).default(DEFAULT_STAGE_TIMEOUT_MS),
         maxRetries: z.number().min(0).max(10).default(DEFAULT_MAX_RETRIES),
         subagentProvider: z.string().default(DEFAULT_SUBAGENT_PROVIDER),
-        // 决策 4（P3）：facai skills 来源（builtin|dir|git）。缺省走 builtin 兜底。
+        // 决策 4（P3 修订）：facai skills 外部来源（dir|git）。缺省不配置 =
+        // 只读项目自身 .agents/skills/（插件不内置任何技能）。
         skillsSource: z.object({
             kind: z.string(),
             path: z.string(),
@@ -281,10 +277,11 @@ export default class CmWorkerService extends Service {
             }
             return manager;
         };
-        // 决策 4（P3）：skills 来源。builtin 兜底到包内 assets/skills/，新项目
-        // 无需先跑 facai-init；dir/git 可指向外部技能仓库。读取顺序：项目自身
-        // `.agents/skills/<skill>/SKILL.md`（facai-init 或人工放置的优先）→ 来源。
-        const skills = new SkillSource(normalizeSkillsSource(config.skillsSource), builtinSkillsRoot());
+        // 决策 4（P3 修订）：skills 外部来源。**插件不内置任何技能**——facai
+        // skills 是项目/组织特定的（编码 fac-ai-rs 的规则），所以流水线总是先读
+        // 项目自身 `.agents/skills/<skill>/SKILL.md`（facai-init 或人工放置）；
+        // skillsSource（dir|git）只是可选的外部技能仓库兜底。
+        const skills = new SkillSource(normalizeSkillsSource(config.skillsSource));
         this.pipeline = new WorkerPipeline({
             pgmas,
             database,

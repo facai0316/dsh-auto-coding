@@ -1,6 +1,5 @@
 import { a as ProjectsRepo, d as RequirementsRepo, f as ReviewsRepo, m as WorkerConfigRepo, o as QuestionsRepo, r as DEFAULT_WORKER_CONFIG } from "./flow-repo-CYXdfSKZ.js";
 import { existsSync, mkdirSync, readdirSync, symlinkSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -12,24 +11,31 @@ import { execFileSync } from "node:child_process";
 //#region build/skills-source.js
 /**
 * Skills source resolution for the coding-pipeline worker (plan 10, decision 4
-* / P3): where the facai skills come from when a project has not run
-* `facai-init`. Decorator-free so vitest/esbuild can exercise it directly.
+* / P3, revised 2026-08-16): where the facai skills come from when a project
+* has not run `facai-init`.
 *
-*  - `builtin` — the mega package's own `assets/skills/` (bundled fallback);
+* The plugin does NOT bundle any skills — the facai skills are project- and
+* org-specific (they encode fac-ai-rs rules and workflows), so shipping them
+* in the plugin would be wrong for every other project. The pipeline always
+* reads the project's own `.agents/skills/<skill>/SKILL.md` first; a
+* configured external source (`dir` | `git`) is an optional fallback for
+* teams that keep a shared skills repo:
+*
 *  - `dir` — an absolute directory laid out as `<dir>/<skill>/SKILL.md`;
 *  - `git` — a git repo cloned on demand into a content-addressed cache dir
 *    (`<tmp>/auto-coding-skills/<hash-of-url+ref>`), laid out the same way.
 *
-* The worker copies the resolved skill set into each task worktree's
-* `.agents/skills/` (missing skills only), so a fresh project is usable
-* without `facai-init`.
+* With no `skillsSource` configured, missing skills fail loudly with a
+* message telling the user to put the skills in the project (run
+* `/facai-init` from the coding-pipline-skills repo, see the README).
+*
+* Decorator-free so vitest/esbuild can exercise it directly.
 *
 * @module @auto-coding/mega/skills-source
 */
-const DEFAULT_SKILLS_SOURCE = { kind: "builtin" };
-/** Validate a raw row config value; unknown/invalid kinds fall back to builtin. */
+/** Validate a raw row config value; absent/unknown kinds mean "no external source". */
 function normalizeSkillsSource(input) {
-	if (input === void 0 || input === null || typeof input !== "object") return DEFAULT_SKILLS_SOURCE;
+	if (input === void 0 || input === null || typeof input !== "object") return void 0;
 	const raw = input;
 	if (raw.kind === "dir") {
 		if (typeof raw.path !== "string" || raw.path === "") throw new Error("skillsSource kind=dir 需要非空 path");
@@ -46,25 +52,20 @@ function normalizeSkillsSource(input) {
 			ref: typeof raw.ref === "string" && raw.ref !== "" ? raw.ref : void 0
 		};
 	}
-	return DEFAULT_SKILLS_SOURCE;
 }
 /**
 * Resolve one skill directory (the dir whose `SKILL.md` is the skill body)
-* from the configured source. Returns undefined when the source does not
-* provide the skill. `builtinRoot` is the absolute path of the package's
-* `assets/skills/` (the caller derives it from `import.meta.url` so the
-* location survives bundling).
+* from the configured external source. Returns undefined when no source is
+* configured or the source does not provide the skill.
 */
 var SkillSource = class {
 	config;
-	builtinRoot;
-	constructor(config, builtinRoot) {
+	constructor(config) {
 		this.config = config;
-		this.builtinRoot = builtinRoot;
 	}
-	/** All skill names this source provides. */
+	/** All skill names this source provides (empty with no source). */
 	list() {
-		const root = this.rootSync();
+		const root = this.root();
 		if (root === void 0) return [];
 		try {
 			return readdirSync(root).filter((name) => {
@@ -80,7 +81,7 @@ var SkillSource = class {
 	}
 	/** The directory holding `<skill>/SKILL.md`, or undefined. */
 	skillDir(skill) {
-		const root = this.rootSync();
+		const root = this.root();
 		if (root === void 0) return void 0;
 		const dir = join(root, skill);
 		try {
@@ -89,16 +90,16 @@ var SkillSource = class {
 			return;
 		}
 	}
-	rootSync() {
-		switch (this.config.kind) {
-			case "builtin": return existsSync(this.builtinRoot) ? this.builtinRoot : void 0;
+	root() {
+		switch (this.config?.kind) {
 			case "dir": return existsSync(this.config.path) ? this.config.path : void 0;
-			case "git": return this.gitRootSync();
+			case "git": return this.gitRoot();
+			default: return;
 		}
 	}
 	/** Clone (once per url+ref, cached) and return the checkout dir. */
-	gitRootSync() {
-		if (this.config.kind !== "git") return void 0;
+	gitRoot() {
+		if (this.config?.kind !== "git") return void 0;
 		const key = createHash("sha1").update(`${this.config.url}#${this.config.ref ?? "HEAD"}`).digest("hex").slice(0, 12);
 		const cache = join(tmpdir(), "auto-coding-skills", key);
 		if (existsSync(join(cache, ".git"))) return cache;
@@ -1429,10 +1430,6 @@ const DEFAULT_POLL_MS = 1e4;
 const DEFAULT_STAGE_TIMEOUT_MS = 18e5;
 const DEFAULT_MAX_RETRIES = 10;
 const DEFAULT_SUBAGENT_PROVIDER = "spawn";
-/** 包内 assets/skills 的绝对路径（builtin 兜底源；经 import.meta.url 定位，随打包存活）。 */
-function builtinSkillsRoot() {
-	return fileURLToPath(new URL("../assets/skills/", import.meta.url));
-}
 /** 阶段会话统一结构化输出契约（ObjectJsonSchema，subagent outputSchema 用）。 */
 const STAGE_RESULT_SCHEMA = {
 	type: "object",
@@ -1695,7 +1692,7 @@ var CmWorkerService = class extends Service {
 			}
 			return manager;
 		};
-		const skills = new SkillSource(normalizeSkillsSource(config.skillsSource), builtinSkillsRoot());
+		const skills = new SkillSource(normalizeSkillsSource(config.skillsSource));
 		this.pipeline = new WorkerPipeline({
 			pgmas,
 			database,

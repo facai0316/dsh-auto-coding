@@ -33,7 +33,11 @@ export interface Config {
     stageTimeoutMs: number;
     maxRetries: number;
     subagentProvider: string;
-    /** facai skills 来源（决策 4）：builtin（包内 assets/skills 兜底）| dir | git。 */
+    /**
+     * facai skills 外部来源（决策 4 修订：**插件不内置 skills**，那套 facai
+     * skills 是项目/组织特定的）。可选：dir（绝对路径）| git（url+ref）；
+     * 缺省/未配置 = 只读项目自身 `.agents/skills/`（需先跑 facai-init）。
+     */
     skillsSource?: SkillsSourceConfig;
 }
 /** 阶段会话统一结构化输出契约（ObjectJsonSchema，subagent outputSchema 用）。 */

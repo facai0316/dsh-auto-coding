@@ -58,6 +58,7 @@
   "files": [
     "lib",
     "src",
+    "assets",
     "package.json"
   ]
 }

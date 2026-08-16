@@ -260,9 +260,9 @@ export interface PipelineDeps {
   /** 读取项目 skill 的 SKILL.md 全文。 */
   readSkillMd: (repo: string, skill: string) => Promise<string>
   /**
-   * 把技能集装进任务 worktree 的 `.agents/skills/`（仅补缺失项）。默认
-   * no-op——项目经 facai-init 已有技能；配置了 skillsSource 时 worker 注入
-   * 实现，让新项目开箱即用（决策 4 / P3）。
+   * 把外部 skillsSource（dir|git）的技能集补进任务 worktree 的
+   * `.agents/skills/`（仅补缺失项）。插件不内置技能；未配置 skillsSource 时
+   * 该钩子缺省 no-op，流水线只读项目自身 `.agents/skills/`（决策 4 / P3 修订）。
    */
   provisionSkills?: (wtPath: string) => Promise<void>
   /** 产物存在性校验：相对 worktree 根的一个相对路径是否真实存在（不存在返回 false）。 */

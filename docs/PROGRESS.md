@@ -254,12 +254,15 @@ ui-requirements 的修改、pnpm-lock.yaml。建议完成 §3.1–3.3 后再提�
   行（mega/db、/flow、/worker）resolve 失败永久非 client 行，仅根行
   `@auto-coding/mega`（ui-requirements）成为 client 行——解法 2 天然成立。
 - **git 分发（决策 B 定案）**：`scripts/build-dist.mjs` 组装 `dist/mega/`（lib +
-  patch + assets/skills + 精简 manifest）；pnpm `&path:/dist/mega` 子目录片段实测
-  可用，本地裸仓 + `dsh plugin add git+file://…#v0.2.0&path:/dist/mega` 全流程
-  验证：安装 → reconcile → 四行挂载 → 包内含 builtin skills。
-- **P3 skills 外部源**：`skills-source.ts`（builtin|dir|git）+ worker `skillsSource`
-  config + readSkillMd 回退 + worktree 创建后 provisionSkills 补装；缺省 builtin
-  → 包内 `assets/skills/`，新项目免 facai-init。
+  patch + assets/USAGE.md + 精简 manifest）；pnpm `&path:/dist/mega` 子目录片段实测
+  可用，本地裸仓 + `dsh plugin add git+file://…#v0.3.0&path:/dist/mega` 全流程
+  验证：安装 → reconcile → 四行挂载。
+- **P3 skills 外部源（2026-08-16 修订：不内置技能）**：`skills-source.ts`
+  （`dir`|`git` 两源，`builtin` 已移除）+ worker `skillsSource` config +
+  readSkillMd 回退 + worktree 创建后 provisionSkills 补装。**插件不打包任何
+  skills**——facai skills 是项目/组织特定（编码 fac-ai-rs 规则），必须配合
+  coding-pipline-skills 使用（`.agents/skills/` 放进项目 + `/facai-init`）；
+  未配置 skillsSource 时只读项目自身技能，缺失即报错提示。
 - **待办**：本机 web profile 从四独立包切到 mega（§3.1 重启时一并做，见下）；
   推远端 tag 后目标机器一键安装实测；旧四包归档。
 
