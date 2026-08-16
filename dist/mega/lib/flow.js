@@ -1,4 +1,4 @@
-import { _ as canTransition, a as ProjectsRepo, c as REQUIREMENT_STATUSES, d as RequirementsRepo, f as ReviewsRepo, g as assertStatus, h as assertRecordStatus, i as MAX_CONCURRENCY, l as REVIEW_KINDS, m as WorkerConfigRepo, n as DEFAULT_USER_ID, o as QuestionsRepo, p as TRANSITIONS, r as DEFAULT_WORKER_CONFIG, s as RECORD_STATUSES, t as DEFAULT_DATABASE, u as REVIEW_STATUSES, v as normalizeWorkerConfig } from "./flow-repo-BS4Vcoaj.js";
+import { _ as canTransition, a as ProjectsRepo, c as REQUIREMENT_STATUSES, d as RequirementsRepo, f as ReviewsRepo, g as assertStatus, h as assertRecordStatus, i as MAX_CONCURRENCY, l as REVIEW_KINDS, m as WorkerConfigRepo, n as DEFAULT_USER_ID, o as QuestionsRepo, p as TRANSITIONS, r as DEFAULT_WORKER_CONFIG, s as RECORD_STATUSES, t as DEFAULT_DATABASE, u as REVIEW_STATUSES, v as normalizeWorkerConfig, y as runMigrations } from "./flow-repo-CYXdfSKZ.js";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import z from "@deepseek-ai/schemastery";
 //#region build/flow.js
@@ -197,7 +197,11 @@ let CmFlowService = (() => {
 				pgmas,
 				database,
 				userId
-			}));
+			}), {
+				pgmas,
+				database,
+				userId
+			});
 		}
 		async list(projectId) {
 			return this.repo.list(projectId === void 0 ? {} : { projectId });
@@ -548,12 +552,14 @@ let ConfigService = (() => {
 	let _instanceExtraInitializers = [];
 	let _get_decorators;
 	let _set_decorators;
+	let _migrate_decorators;
 	let _providers_decorators;
 	return class ConfigService extends _classSuper {
 		static {
 			const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
 			_get_decorators = [Remote("get")];
 			_set_decorators = [Remote("set")];
+			_migrate_decorators = [Remote("migrate")];
 			_providers_decorators = [Remote("providers")];
 			__esDecorate(this, null, _get_decorators, {
 				kind: "method",
@@ -577,6 +583,17 @@ let ConfigService = (() => {
 				},
 				metadata: _metadata
 			}, null, _instanceExtraInitializers);
+			__esDecorate(this, null, _migrate_decorators, {
+				kind: "method",
+				name: "migrate",
+				static: false,
+				private: false,
+				access: {
+					has: (obj) => "migrate" in obj,
+					get: (obj) => obj.migrate
+				},
+				metadata: _metadata
+			}, null, _instanceExtraInitializers);
 			__esDecorate(this, null, _providers_decorators, {
 				kind: "method",
 				name: "providers",
@@ -596,15 +613,42 @@ let ConfigService = (() => {
 			});
 		}
 		repo = __runInitializers(this, _instanceExtraInitializers);
-		constructor(ctx, repo) {
+		pgmas;
+		database;
+		userId;
+		constructor(ctx, repo, migration) {
 			super(ctx, "cmConfig", { namespace: "config" });
 			this.repo = repo;
+			this.pgmas = migration.pgmas;
+			this.database = migration.database;
+			this.userId = migration.userId;
 		}
 		async get() {
 			return this.repo.get();
 		}
 		async set(config) {
 			return this.repo.set(config);
+		}
+		/**
+		* 显式跑一遍 schema 迁移（幂等：已应用的 version 跳过）。数据库连接卡片
+		* 的「迁移」按钮调用它——配好连接后点一下即可补齐 cm 库 schema，返回本次
+		* 实际应用的迁移列表（空 = 已是最新）。
+		*/
+		async migrate() {
+			try {
+				const applied = await runMigrations(this.pgmas, this.database, this.userId);
+				return {
+					ok: true,
+					applied,
+					message: applied.length > 0 ? `已应用 ${applied.length} 个迁移：${applied.join("；")}` : "schema 已是最新，无需迁移"
+				};
+			} catch (cause) {
+				return {
+					ok: false,
+					applied: [],
+					message: `迁移失败:${cause instanceof Error ? cause.message : String(cause)}`
+				};
+			}
 		}
 		/** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
 		async providers() {
@@ -632,4 +676,4 @@ let ConfigService = (() => {
 	};
 })();
 //#endregion
-export { ConfigService, DEFAULT_DATABASE, DEFAULT_USER_ID, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, ProjectsRepo, ProjectsService, QuestionsRepo, QuestionsService, RECORD_STATUSES, REQUIREMENT_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, RecordsService, RequirementsRepo, ReviewsRepo, ReviewsService, TRANSITIONS, WorkerConfigRepo, assertRecordStatus, assertStatus, canTransition, CmFlowService as default, normalizeWorkerConfig };
+export { ConfigService, DEFAULT_DATABASE, DEFAULT_USER_ID, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, ProjectsRepo, ProjectsService, QuestionsRepo, QuestionsService, RECORD_STATUSES, REQUIREMENT_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, RecordsService, RequirementsRepo, ReviewsRepo, ReviewsService, TRANSITIONS, WorkerConfigRepo, assertRecordStatus, assertStatus, canTransition, CmFlowService as default, normalizeWorkerConfig, runMigrations as runCmMigrations };

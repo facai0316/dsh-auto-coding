@@ -54,8 +54,8 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
 };
 import z from '@deepseek-ai/schemastery';
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import { DEFAULT_DATABASE, DEFAULT_USER_ID, ProjectsRepo, QuestionsRepo, RequirementsRepo, ReviewsRepo, WorkerConfigRepo, } from "./flow-repo.js";
-export { REQUIREMENT_STATUSES, RECORD_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, TRANSITIONS, RequirementsRepo, ProjectsRepo, QuestionsRepo, ReviewsRepo, WorkerConfigRepo, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, normalizeWorkerConfig, assertStatus, assertRecordStatus, canTransition, DEFAULT_DATABASE, DEFAULT_USER_ID, } from "./flow-repo.js";
+import { DEFAULT_DATABASE, DEFAULT_USER_ID, ProjectsRepo, QuestionsRepo, RequirementsRepo, ReviewsRepo, WorkerConfigRepo, runMigrations as runCmMigrations, } from "./flow-repo.js";
+export { REQUIREMENT_STATUSES, RECORD_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, TRANSITIONS, RequirementsRepo, ProjectsRepo, QuestionsRepo, ReviewsRepo, WorkerConfigRepo, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, normalizeWorkerConfig, assertStatus, assertRecordStatus, canTransition, DEFAULT_DATABASE, DEFAULT_USER_ID, runMigrations as runCmMigrations, } from "./flow-repo.js";
 function resolvePgmas(ctx) {
     const pgmas = ctx.get('pgmas');
     if (pgmas === undefined)
@@ -105,7 +105,7 @@ let CmFlowService = (() => {
             new QuestionsService(ctx, new QuestionsRepo({ pgmas, database, userId }));
             new ReviewsService(ctx, new ReviewsRepo({ pgmas, database, userId }));
             new RecordsService(ctx, this.repo);
-            new ConfigService(ctx, new WorkerConfigRepo({ pgmas, database, userId }));
+            new ConfigService(ctx, new WorkerConfigRepo({ pgmas, database, userId }), { pgmas, database, userId });
         }
         async list(projectId) {
             return this.repo.list(projectId === undefined ? {} : { projectId });
@@ -302,28 +302,58 @@ let ConfigService = (() => {
     let _instanceExtraInitializers = [];
     let _get_decorators;
     let _set_decorators;
+    let _migrate_decorators;
     let _providers_decorators;
     return class ConfigService extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _get_decorators = [Remote('get')];
             _set_decorators = [Remote('set')];
+            _migrate_decorators = [Remote('migrate')];
             _providers_decorators = [Remote('providers')];
             __esDecorate(this, null, _get_decorators, { kind: "method", name: "get", static: false, private: false, access: { has: obj => "get" in obj, get: obj => obj.get }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _set_decorators, { kind: "method", name: "set", static: false, private: false, access: { has: obj => "set" in obj, get: obj => obj.set }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _migrate_decorators, { kind: "method", name: "migrate", static: false, private: false, access: { has: obj => "migrate" in obj, get: obj => obj.migrate }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _providers_decorators, { kind: "method", name: "providers", static: false, private: false, access: { has: obj => "providers" in obj, get: obj => obj.providers }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         repo = __runInitializers(this, _instanceExtraInitializers);
-        constructor(ctx, repo) {
+        pgmas;
+        database;
+        userId;
+        constructor(ctx, repo, migration) {
             super(ctx, 'cmConfig', { namespace: 'config' });
             this.repo = repo;
+            this.pgmas = migration.pgmas;
+            this.database = migration.database;
+            this.userId = migration.userId;
         }
         async get() {
             return this.repo.get();
         }
         async set(config) {
             return this.repo.set(config);
+        }
+        /**
+         * 显式跑一遍 schema 迁移（幂等：已应用的 version 跳过）。数据库连接卡片
+         * 的「迁移」按钮调用它——配好连接后点一下即可补齐 cm 库 schema，返回本次
+         * 实际应用的迁移列表（空 = 已是最新）。
+         */
+        async migrate() {
+            try {
+                const applied = await runCmMigrations(this.pgmas, this.database, this.userId);
+                return {
+                    ok: true,
+                    applied,
+                    message: applied.length > 0
+                        ? `已应用 ${applied.length} 个迁移：${applied.join('；')}`
+                        : 'schema 已是最新，无需迁移',
+                };
+            }
+            catch (cause) {
+                const message = cause instanceof Error ? cause.message : String(cause);
+                return { ok: false, applied: [], message: `迁移失败:${message}` };
+            }
         }
         /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
         async providers() {

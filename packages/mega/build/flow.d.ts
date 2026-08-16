@@ -21,6 +21,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
+import type { PgMasService } from './db.ts';
 import { ProjectsRepo, QuestionsRepo, RequirementsRepo, ReviewsRepo, WorkerConfigRepo, type ProjectView, type QuestionView, type RecordListItem, type RecordView, type RequirementView, type RequirementWithStages, type ReviewView, type WorkerConfig } from './flow-repo.ts';
 export type { RequirementStatus, RecordStatus, RequirementView, RequirementWithStages, StageSummary, RecordView, RecordListItem, RecordInput, ProjectView, QuestionView, ReviewKind, ReviewStatus, ReviewView, WriteSeam, RepoOptions, WorkerConfig, StageModelConfig, } from './flow-repo.ts';
 /** 一个 LLM 模型的目录条目（面板下拉用）。 */
@@ -34,7 +35,7 @@ export interface LlmProviderInfo {
     name: string;
     models: LlmModelInfo[];
 }
-export { REQUIREMENT_STATUSES, RECORD_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, TRANSITIONS, RequirementsRepo, ProjectsRepo, QuestionsRepo, ReviewsRepo, WorkerConfigRepo, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, normalizeWorkerConfig, assertStatus, assertRecordStatus, canTransition, DEFAULT_DATABASE, DEFAULT_USER_ID, } from './flow-repo.ts';
+export { REQUIREMENT_STATUSES, RECORD_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, TRANSITIONS, RequirementsRepo, ProjectsRepo, QuestionsRepo, ReviewsRepo, WorkerConfigRepo, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, normalizeWorkerConfig, assertStatus, assertRecordStatus, canTransition, DEFAULT_DATABASE, DEFAULT_USER_ID, runMigrations as runCmMigrations, } from './flow-repo.ts';
 export interface Config {
     database: string;
     userId: string;
@@ -95,9 +96,26 @@ export declare class RecordsService extends TypertRemoteService {
 /** Typert Remote service (namespace `config`): worker 运行配置读写 + LLM 目录。 */
 export declare class ConfigService extends TypertRemoteService {
     private readonly repo;
-    constructor(ctx: Context, repo: WorkerConfigRepo);
+    private readonly pgmas;
+    private readonly database;
+    private readonly userId;
+    constructor(ctx: Context, repo: WorkerConfigRepo, migration: {
+        pgmas: PgMasService;
+        database: string;
+        userId: string;
+    });
     get(): Promise<WorkerConfig>;
     set(config: WorkerConfig): Promise<WorkerConfig>;
+    /**
+     * 显式跑一遍 schema 迁移（幂等：已应用的 version 跳过）。数据库连接卡片
+     * 的「迁移」按钮调用它——配好连接后点一下即可补齐 cm 库 schema，返回本次
+     * 实际应用的迁移列表（空 = 已是最新）。
+     */
+    migrate(): Promise<{
+        ok: boolean;
+        applied: string[];
+        message: string;
+    }>;
     /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
     providers(): Promise<LlmProviderInfo[]>;
 }

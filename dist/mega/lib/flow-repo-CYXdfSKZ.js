@@ -287,9 +287,12 @@ const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 const DEFAULT_DATABASE = "cm";
 /**
 * Ensure schema + fixed dsh user exist. Idempotent; safe to run from any repo
-* construction (version rows skip already-applied migrations).
+* construction (version rows skip already-applied migrations). Returns the
+* names of migrations applied on this run (empty when everything was already
+* up to date) — used by the panel's「迁移」button to report progress.
 */
 async function runMigrations(pgmas, database, userId) {
+	const applied = [];
 	await pgmas.withClient(database, async (client) => {
 		await client.query("select pg_advisory_lock(747200001)");
 		try {
@@ -310,6 +313,7 @@ async function runMigrations(pgmas, database, userId) {
 					await migration.apply(client);
 					await client.query("insert into _cm_flow_migrations (version, name) values ($1, $2)", [migration.version, migration.name]);
 					await client.query("commit");
+					applied.push(`v${migration.version} ${migration.name}`);
 				} catch (error) {
 					await client.query("rollback");
 					throw error;
@@ -319,6 +323,7 @@ async function runMigrations(pgmas, database, userId) {
 			await client.query("select pg_advisory_unlock(747200001)");
 		}
 	});
+	return applied;
 }
 /** Requirements storage + state machine + stage ledger. */
 var RequirementsRepo = class {
@@ -939,4 +944,4 @@ var WorkerConfigRepo = class {
 	}
 };
 //#endregion
-export { canTransition as _, ProjectsRepo as a, REQUIREMENT_STATUSES as c, RequirementsRepo as d, ReviewsRepo as f, assertStatus as g, assertRecordStatus as h, MAX_CONCURRENCY as i, REVIEW_KINDS as l, WorkerConfigRepo as m, DEFAULT_USER_ID as n, QuestionsRepo as o, TRANSITIONS as p, DEFAULT_WORKER_CONFIG as r, RECORD_STATUSES as s, DEFAULT_DATABASE as t, REVIEW_STATUSES as u, normalizeWorkerConfig as v };
+export { canTransition as _, ProjectsRepo as a, REQUIREMENT_STATUSES as c, RequirementsRepo as d, ReviewsRepo as f, assertStatus as g, assertRecordStatus as h, MAX_CONCURRENCY as i, REVIEW_KINDS as l, WorkerConfigRepo as m, DEFAULT_USER_ID as n, QuestionsRepo as o, TRANSITIONS as p, DEFAULT_WORKER_CONFIG as r, RECORD_STATUSES as s, DEFAULT_DATABASE as t, REVIEW_STATUSES as u, normalizeWorkerConfig as v, runMigrations as y };

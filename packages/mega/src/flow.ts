@@ -31,6 +31,7 @@ import {
   RequirementsRepo,
   ReviewsRepo,
   WorkerConfigRepo,
+  runMigrations as runCmMigrations,
   type ProjectView,
   type QuestionView,
   type RecordListItem,
@@ -92,6 +93,7 @@ export {
   canTransition,
   DEFAULT_DATABASE,
   DEFAULT_USER_ID,
+  runMigrations as runCmMigrations,
 } from './flow-repo.ts'
 
 export interface Config {
@@ -133,7 +135,7 @@ export default class CmFlowService extends TypertRemoteService {
     new QuestionsService(ctx, new QuestionsRepo({ pgmas, database, userId }))
     new ReviewsService(ctx, new ReviewsRepo({ pgmas, database, userId }))
     new RecordsService(ctx, this.repo)
-    new ConfigService(ctx, new WorkerConfigRepo({ pgmas, database, userId }))
+    new ConfigService(ctx, new WorkerConfigRepo({ pgmas, database, userId }), { pgmas, database, userId })
   }
 
   @Remote('list')
@@ -290,10 +292,16 @@ export class RecordsService extends TypertRemoteService {
 /** Typert Remote service (namespace `config`): worker 运行配置读写 + LLM 目录。 */
 export class ConfigService extends TypertRemoteService {
   private readonly repo: WorkerConfigRepo
+  private readonly pgmas: PgMasService
+  private readonly database: string
+  private readonly userId: string
 
-  constructor(ctx: Context, repo: WorkerConfigRepo) {
+  constructor(ctx: Context, repo: WorkerConfigRepo, migration: { pgmas: PgMasService; database: string; userId: string }) {
     super(ctx, 'cmConfig', { namespace: 'config' })
     this.repo = repo
+    this.pgmas = migration.pgmas
+    this.database = migration.database
+    this.userId = migration.userId
   }
 
   @Remote('get')
@@ -304,6 +312,28 @@ export class ConfigService extends TypertRemoteService {
   @Remote('set')
   async set(config: WorkerConfig): Promise<WorkerConfig> {
     return this.repo.set(config)
+  }
+
+  /**
+   * 显式跑一遍 schema 迁移（幂等：已应用的 version 跳过）。数据库连接卡片
+   * 的「迁移」按钮调用它——配好连接后点一下即可补齐 cm 库 schema，返回本次
+   * 实际应用的迁移列表（空 = 已是最新）。
+   */
+  @Remote('migrate')
+  async migrate(): Promise<{ ok: boolean; applied: string[]; message: string }> {
+    try {
+      const applied = await runCmMigrations(this.pgmas, this.database, this.userId)
+      return {
+        ok: true,
+        applied,
+        message: applied.length > 0
+          ? `已应用 ${applied.length} 个迁移：${applied.join('；')}`
+          : 'schema 已是最新，无需迁移',
+      }
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause)
+      return { ok: false, applied: [], message: `迁移失败:${message}` }
+    }
   }
 
   /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */

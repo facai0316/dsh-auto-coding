@@ -46,3 +46,21 @@ describe('@auto-coding/mega shared host helpers', () => {
     expect(validatePgConfig({ host: 'h', port: 70000, user: 'u', database: 'd' })).toContain('port')
   })
 })
+
+describe('@auto-coding/mega usage documentation', () => {
+  const usage = readFileSync(join(here, '..', 'assets', 'USAGE.md'), 'utf8')
+
+  it('ships a packaged USAGE.md served by the usage remote', () => {
+    expect(usage).toContain('# 使用说明')
+  })
+
+  it('walks the user through the four setup steps', () => {
+    expect(usage).toContain('配置数据库')
+    expect(usage).toContain('迁移')
+    expect(usage).toContain('coding-pipline-skills')
+    expect(usage).toContain('添加项目')
+    expect(usage).toContain('/facai-init')
+    // 内置 builtin 技能源 → 新项目免手动装技能。
+    expect(usage).toContain('builtin')
+  })
+})

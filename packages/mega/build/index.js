@@ -53,6 +53,7 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     done = true;
 };
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { PG_DEFAULTS, findRowConfig, mergedConfig, parsePatchFile, resolvePatchPath, serializePatch, validatePgConfig, } from "./patch-utils.js";
 export { findRowConfig, validatePgConfig, PG_DEFAULTS } from "./patch-utils.js";
@@ -174,17 +175,20 @@ let PgConfigRemote = (() => {
 export { PgConfigRemote };
 const USAGE_PLACEHOLDER = `# 使用说明
 
-> 文档占位:使用说明内容待补充。
-
-## 数据库连接
-
-- 打开「设置 → 数据库连接」可查看/修改 pg 连接参数。
-- 修改后点「保存并应用」:写入 \`cordis.patch.yml\` 用户层覆盖,经 patch watcher 热生效,无需重启。
-
-## 自动化看板
-
-- 顶部会话视图 tab「自动化看板」:项目 / 需求 / 运行 / 审核 / 配置。
+> 文档占位:使用说明内容待补充（包内 assets/USAGE.md 缺失）。
 `;
+/**
+ * 包内自带的使用说明文档（assets/USAGE.md）。经 import.meta.url 定位，
+ * 随 dist/mega 分发，因此「使用说明」页开箱即用、无需额外配置。
+ */
+function packagedUsagePath() {
+    try {
+        return fileURLToPath(new URL('../assets/USAGE.md', import.meta.url));
+    }
+    catch {
+        return undefined;
+    }
+}
 /** usage remote: return the usage markdown document. */
 let UsageRemote = (() => {
     let _classSuper = TypertRemoteService;
@@ -203,13 +207,15 @@ let UsageRemote = (() => {
             this.usagePath = usagePath;
         }
         async get() {
-            if (this.usagePath) {
+            // 显式配置的 usagePath 优先；否则用包内自带的 assets/USAGE.md。
+            const candidates = [this.usagePath, packagedUsagePath()].filter((path) => path !== undefined);
+            for (const candidate of candidates) {
                 try {
-                    const text = readFileSync(this.usagePath, 'utf8');
+                    const text = readFileSync(candidate, 'utf8');
                     return { markdown: text, source: 'file' };
                 }
                 catch {
-                    return { markdown: `# 使用说明\n\n> 无法读取文档文件:${this.usagePath}\n\n${USAGE_PLACEHOLDER}`, source: 'placeholder' };
+                    // Try the next candidate.
                 }
             }
             return { markdown: USAGE_PLACEHOLDER, source: 'placeholder' };

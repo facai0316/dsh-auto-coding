@@ -19011,64 +19011,64 @@ onKeyDown: (e) => this.foundation._handleKeyDown(e) });
 			document.head.appendChild(tag);
 		}
 		var RequirementsPanel_module_css_default = {
-			"questionText": "_jO-6W_questionText",
-			"questionOptions": "_jO-6W_questionOptions",
-			"waiting_review": "_jO-6W_waiting_review",
-			"navTabActive": "_jO-6W_navTabActive",
-			"sectionTitle": "_jO-6W_sectionTitle",
-			"formRow": "_jO-6W_formRow",
-			"navTab": "_jO-6W_navTab",
-			"reviewList": "_jO-6W_reviewList",
-			"body": "_jO-6W_body",
-			"metaRow": "_jO-6W_metaRow",
-			"foot": "_jO-6W_foot",
-			"questionList": "_jO-6W_questionList",
-			"filterSelect": "_jO-6W_filterSelect",
-			"failed": "_jO-6W_failed",
-			"projectRow": "_jO-6W_projectRow",
-			"reviewFeedback": "_jO-6W_reviewFeedback",
-			"stageDotPulse": "_jO-6W_stageDotPulse",
-			"stageDot": "_jO-6W_stageDot",
-			"projectRowName": "_jO-6W_projectRowName",
-			"projectBar": "_jO-6W_projectBar",
-			"projectRowPath": "_jO-6W_projectRowPath",
-			"tagList": "_jO-6W_tagList",
-			"toolbar": "_jO-6W_toolbar",
-			"navTabs": "_jO-6W_navTabs",
-			"card": "_jO-6W_card",
-			"questionItem": "_jO-6W_questionItem",
-			"cardTitle": "_jO-6W_cardTitle",
-			"success": "_jO-6W_success",
-			"navRight": "_jO-6W_navRight",
-			"page": "_jO-6W_page",
-			"feedback": "_jO-6W_feedback",
-			"grid": "_jO-6W_grid",
-			"cardActions": "_jO-6W_cardActions",
-			"pager": "_jO-6W_pager",
-			"reviewActions": "_jO-6W_reviewActions",
-			"cardDesc": "_jO-6W_cardDesc",
-			"projectList": "_jO-6W_projectList",
-			"metaRows": "_jO-6W_metaRows",
-			"projectSelect": "_jO-6W_projectSelect",
 			"stageRow": "_jO-6W_stageRow",
-			"cardHead": "_jO-6W_cardHead",
-			"error": "_jO-6W_error",
+			"failed": "_jO-6W_failed",
+			"feedback": "_jO-6W_feedback",
+			"stageTimeline": "_jO-6W_stageTimeline",
 			"nav": "_jO-6W_nav",
-			"toolbarInfo": "_jO-6W_toolbarInfo",
-			"form": "_jO-6W_form",
-			"retrying": "_jO-6W_retrying",
-			"filters": "_jO-6W_filters",
-			"cardHeadActions": "_jO-6W_cardHeadActions",
 			"configSelect": "_jO-6W_configSelect",
-			"markdownBody": "_jO-6W_markdownBody",
-			"navBadge": "_jO-6W_navBadge",
-			"center": "_jO-6W_center",
+			"grid": "_jO-6W_grid",
+			"tagList": "_jO-6W_tagList",
+			"questionItem": "_jO-6W_questionItem",
+			"reviewFeedback": "_jO-6W_reviewFeedback",
+			"projectBar": "_jO-6W_projectBar",
+			"projectList": "_jO-6W_projectList",
+			"sectionTitle": "_jO-6W_sectionTitle",
+			"panel": "_jO-6W_panel",
+			"projectSelect": "_jO-6W_projectSelect",
+			"filters": "_jO-6W_filters",
+			"toolbar": "_jO-6W_toolbar",
+			"cardHead": "_jO-6W_cardHead",
 			"formField": "_jO-6W_formField",
+			"stageDot": "_jO-6W_stageDot",
+			"waiting_review": "_jO-6W_waiting_review",
+			"questionList": "_jO-6W_questionList",
+			"metaRows": "_jO-6W_metaRows",
+			"page": "_jO-6W_page",
+			"projectRow": "_jO-6W_projectRow",
+			"form": "_jO-6W_form",
+			"projectRowPath": "_jO-6W_projectRowPath",
+			"reviewActions": "_jO-6W_reviewActions",
+			"navRight": "_jO-6W_navRight",
+			"projectRowName": "_jO-6W_projectRowName",
+			"center": "_jO-6W_center",
+			"metaLabel": "_jO-6W_metaLabel",
+			"markdownBody": "_jO-6W_markdownBody",
+			"navTabs": "_jO-6W_navTabs",
+			"navTab": "_jO-6W_navTab",
+			"questionText": "_jO-6W_questionText",
+			"cardDesc": "_jO-6W_cardDesc",
+			"foot": "_jO-6W_foot",
+			"cardHeadActions": "_jO-6W_cardHeadActions",
+			"navBadge": "_jO-6W_navBadge",
+			"filterSelect": "_jO-6W_filterSelect",
+			"cardActions": "_jO-6W_cardActions",
+			"error": "_jO-6W_error",
+			"success": "_jO-6W_success",
+			"reviewList": "_jO-6W_reviewList",
+			"stageDotPulse": "_jO-6W_stageDotPulse",
+			"questionOptions": "_jO-6W_questionOptions",
+			"cardTitle": "_jO-6W_cardTitle",
+			"navTabActive": "_jO-6W_navTabActive",
+			"pager": "_jO-6W_pager",
+			"retrying": "_jO-6W_retrying",
+			"toolbarInfo": "_jO-6W_toolbarInfo",
+			"card": "_jO-6W_card",
 			"waiting_reply": "_jO-6W_waiting_reply",
 			"running": "_jO-6W_running",
-			"stageTimeline": "_jO-6W_stageTimeline",
-			"metaLabel": "_jO-6W_metaLabel",
-			"panel": "_jO-6W_panel"
+			"metaRow": "_jO-6W_metaRow",
+			"formRow": "_jO-6W_formRow",
+			"body": "_jO-6W_body"
 		};
 		//#endregion
 		//#region ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.js
@@ -23374,6 +23374,12 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			defaultProvider: string().nullable().optional(),
 			defaultMaxTokens: number().nullable().optional()
 		});
+		/** config/migrate 的返回：ok + 本次实际应用的迁移列表 + 说明。 */
+		const migrationResultSchema = object({
+			ok: boolean(),
+			applied: array(string()),
+			message: string()
+		});
 		const llmModelSchema = object({
 			id: string(),
 			name: string()
@@ -23648,6 +23654,15 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					result: codec("@auto-coding/cm-flow#LlmProviderInfo[]", array(llmProviderSchema))
 				},
 				{
+					id: "@auto-coding/cm-flow#config/migrate",
+					service: "cmConfig",
+					namespace: "config",
+					method: "migrate",
+					invocation: { kind: "direct" },
+					parameters: [],
+					result: codec("@auto-coding/cm-flow#MigrationResult", migrationResultSchema)
+				},
+				{
 					id: "@auto-coding/cm-worker#merge/resolveConflicts",
 					service: "cmMerge",
 					namespace: "merge",
@@ -23844,6 +23859,11 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			async providers() {
 				await whenReady();
 				return unwrap(await remote.config.providers());
+			},
+			/** 显式跑一遍 schema 迁移（幂等）。 */
+			async migrate() {
+				await whenReady();
+				return unwrap(await remote.config.migrate());
 			}
 		};
 		const records = {
@@ -25674,6 +25694,25 @@ async resolveConflicts(requirementId) {
 					setBusy(false);
 				}
 			};
+			/** 显式跑一遍 cm 库 schema 迁移（幂等；配好连接后点一下即可补齐 schema）。 */
+			const handleMigrate = async () => {
+				setBusy(true);
+				setFeedback(null);
+				try {
+					const result = await workerConfig.migrate();
+					setFeedback({
+						kind: result.ok ? "success" : "error",
+						text: result.message
+					});
+				} catch (cause) {
+					setFeedback({
+						kind: "error",
+						text: `迁移失败:${messageOf$5(cause)}`
+					});
+				} finally {
+					setBusy(false);
+				}
+			};
 			if (draft === null || snapshot === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				className: RequirementsPanel_module_css_default.center,
 				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Spin, {})
@@ -25805,22 +25844,33 @@ async resolveConflicts(requirementId) {
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: RequirementsPanel_module_css_default.formRow,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
-							theme: "solid",
-							type: "primary",
-							disabled: busy,
-							onClick: () => {
-								handleTest();
-							},
-							children: "测试连接"
-						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
-							theme: "solid",
-							disabled: busy,
-							onClick: () => {
-								handleSave();
-							},
-							children: "保存并应用"
-						})]
+						children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+								theme: "solid",
+								type: "primary",
+								disabled: busy,
+								onClick: () => {
+									handleTest();
+								},
+								children: "测试连接"
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+								theme: "solid",
+								disabled: busy,
+								onClick: () => {
+									handleMigrate();
+								},
+								children: "迁移（建表）"
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+								theme: "solid",
+								disabled: busy,
+								onClick: () => {
+									handleSave();
+								},
+								children: "保存并应用"
+							})
+						]
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(Typography.Text, {
 						type: "tertiary",

@@ -423,9 +423,12 @@ export const DEFAULT_DATABASE = 'cm'
 
 /**
  * Ensure schema + fixed dsh user exist. Idempotent; safe to run from any repo
- * construction (version rows skip already-applied migrations).
+ * construction (version rows skip already-applied migrations). Returns the
+ * names of migrations applied on this run (empty when everything was already
+ * up to date) — used by the panel's「迁移」button to report progress.
  */
-async function runMigrations(pgmas: WriteSeam, database: string, userId: string): Promise<void> {
+export async function runMigrations(pgmas: WriteSeam, database: string, userId: string): Promise<string[]> {
+  const applied: string[] = []
   await pgmas.withClient(database, async client => {
     // 进程/连接级互斥：并发首次应用同一迁移（如两个测试文件同时建 v5 表）会在
     // pg_type 上撞唯一索引；advisory lock 串行化整个迁移序列。
@@ -445,13 +448,14 @@ async function runMigrations(pgmas: WriteSeam, database: string, userId: string)
         [userId, `dsh+${userId}@dsh.local`],
       )
       for (const migration of MIGRATIONS) {
-        const applied = await client.query('select 1 from _cm_flow_migrations where version = $1', [migration.version])
-        if ((applied.rows ?? []).length > 0) continue
+        const row = await client.query('select 1 from _cm_flow_migrations where version = $1', [migration.version])
+        if ((row.rows ?? []).length > 0) continue
         await client.query('begin')
         try {
           await migration.apply(client)
           await client.query('insert into _cm_flow_migrations (version, name) values ($1, $2)', [migration.version, migration.name])
           await client.query('commit')
+          applied.push(`v${migration.version} ${migration.name}`)
         } catch (error) {
           await client.query('rollback')
           throw error
@@ -461,6 +465,7 @@ async function runMigrations(pgmas: WriteSeam, database: string, userId: string)
       await client.query('select pg_advisory_unlock(747200001)')
     }
   })
+  return applied
 }
 
 // ──────────────────────────────── repos ──────────────────────────────────
@@ -476,7 +481,7 @@ export class RequirementsRepo {
   private readonly database: string
   private readonly userId: string
   private readonly pgmas: WriteSeam
-  private readonly ready: Promise<void>
+  private readonly ready: Promise<string[]>
 
   constructor(options: RepoOptions) {
     this.pgmas = options.pgmas
@@ -866,7 +871,7 @@ export class RequirementsRepo {
 export class ProjectsRepo {
   private readonly database: string
   private readonly pgmas: WriteSeam
-  private readonly ready: Promise<void>
+  private readonly ready: Promise<string[]>
 
   constructor(options: RepoOptions) {
     this.pgmas = options.pgmas
@@ -1010,7 +1015,7 @@ export class ProjectsRepo {
 export class QuestionsRepo {
   private readonly database: string
   private readonly pgmas: WriteSeam
-  private readonly ready: Promise<void>
+  private readonly ready: Promise<string[]>
 
   constructor(options: RepoOptions) {
     this.pgmas = options.pgmas
@@ -1074,7 +1079,7 @@ export class QuestionsRepo {
 export class ReviewsRepo {
   private readonly database: string
   private readonly pgmas: WriteSeam
-  private readonly ready: Promise<void>
+  private readonly ready: Promise<string[]>
 
   constructor(options: RepoOptions) {
     this.pgmas = options.pgmas
@@ -1245,7 +1250,7 @@ function questionRowToView(row: Record<string, unknown>): QuestionView {
 export class WorkerConfigRepo {
   private readonly database: string
   private readonly pgmas: WriteSeam
-  private readonly ready: Promise<void>
+  private readonly ready: Promise<string[]>
 
   constructor(options: RepoOptions) {
     this.pgmas = options.pgmas

@@ -7,6 +7,33 @@ Out-of-tree **dsh (Cordis) 插件包** 仓库：pnpm monorepo，一个目录一�
 
 首个包 `@auto-coding/ui-hello` 是界面类插件的最小可运行样板：在 Web GUI 侧边栏脚部（`sidebar.footer.action`，list 型 Slot、零替换风险）注册一个自包含的计数按钮。
 
+## 📖 快速使用（安装 `@auto-coding/mega` 后）
+
+本插件是 **dsh 编码流水线**（需求 → 决策 → 计划 → 编码 → 契约 → 审核 → 合并），
+**必须配合 [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
+技能包使用**。完整文档在 [使用说明](packages/mega/assets/USAGE.md)（安装后也在
+「自动化看板 → 使用说明」页可见），四步开工：
+
+1. **配置数据库**：打开「自动化看板 → 配置」页，填好 pg 连接参数 →「测试连接」
+   →「保存并应用」（热生效，无需重启）→ 点 **「迁移（建表）」** 补齐 `cm` 库 schema
+   （迁移在 cm-flow 首次挂载时也会自动跑，按钮用于主动跑一遍看结果）。
+2. **准备技能**：worker 已内置 facai skills（`builtin` 源，建 worktree 时自动装进
+   `.agents/skills/`，新项目开箱即用）；如需项目级定制，把
+   [coding-pipline-skills](https://github.com/facai0316/coding-pipline-skills)
+   拉到本地，将其 `.agents/skills/` 复制到项目根目录，再让 agent 运行 `/facai-init`
+   技能生成项目配置（详细用法见其 GitHub 主页）。
+3. **添加项目**：「自动化看板 → 项目」页「新增」：名称 / 本地路径 / Git 地址 / 平台 / PR Token。
+4. **登记需求**：「需求」页「新增」并「开始执行」，worker 自动跑完整流水线，
+   审核大厅处理 待审核 / 待决策 / 待合并。
+
+一键安装（git 分发，零构建）：
+
+```sh
+dsh plugin --profile web add "git+ssh://git@github.com/facai0316/dsh-auto-coding.git#v0.3.0&path:/dist/mega"
+```
+
+安装后重启 `dsh web` 生效（四行插件由包内 patch 自动挂载）。
+
 ## 目录结构
 
 ```

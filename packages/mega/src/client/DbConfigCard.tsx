@@ -11,7 +11,7 @@ import Spin from '@douyinfe/semi-ui/lib/es/spin'
 import Switch from '@douyinfe/semi-ui/lib/es/switch'
 import Typography from '@douyinfe/semi-ui/lib/es/typography'
 import classes from './RequirementsPanel.module.css'
-import { pgConfig, type PgConfigSnapshot } from './remote.ts'
+import { pgConfig, workerConfig, type PgConfigSnapshot } from './remote.ts'
 
 function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
@@ -131,6 +131,20 @@ export function DbConfigCard({ onError }: Props): ReactElement {
     }
   }
 
+  /** 显式跑一遍 cm 库 schema 迁移（幂等；配好连接后点一下即可补齐 schema）。 */
+  const handleMigrate = async (): Promise<void> => {
+    setBusy(true)
+    setFeedback(null)
+    try {
+      const result = await workerConfig.migrate()
+      setFeedback({ kind: result.ok ? 'success' : 'error', text: result.message })
+    } catch (cause) {
+      setFeedback({ kind: 'error', text: `迁移失败:${messageOf(cause)}` })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (draft === null || snapshot === null) {
     return <div className={classes.center}><Spin /></div>
   }
@@ -190,6 +204,7 @@ export function DbConfigCard({ onError }: Props): ReactElement {
 
       <div className={classes.formRow}>
         <Button theme="solid" type="primary" disabled={busy} onClick={() => { void handleTest() }}>测试连接</Button>
+        <Button theme="solid" disabled={busy} onClick={() => { void handleMigrate() }}>迁移（建表）</Button>
         <Button theme="solid" disabled={busy} onClick={() => { void handleSave() }}>保存并应用</Button>
       </div>
       <Typography.Text type="tertiary" size="small">

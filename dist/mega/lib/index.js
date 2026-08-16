@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -300,17 +301,19 @@ let PgConfigRemote = (() => {
 })();
 const USAGE_PLACEHOLDER = `# 使用说明
 
-> 文档占位:使用说明内容待补充。
-
-## 数据库连接
-
-- 打开「设置 → 数据库连接」可查看/修改 pg 连接参数。
-- 修改后点「保存并应用」:写入 \`cordis.patch.yml\` 用户层覆盖,经 patch watcher 热生效,无需重启。
-
-## 自动化看板
-
-- 顶部会话视图 tab「自动化看板」:项目 / 需求 / 运行 / 审核 / 配置。
+> 文档占位:使用说明内容待补充（包内 assets/USAGE.md 缺失）。
 `;
+/**
+* 包内自带的使用说明文档（assets/USAGE.md）。经 import.meta.url 定位，
+* 随 dist/mega 分发，因此「使用说明」页开箱即用、无需额外配置。
+*/
+function packagedUsagePath() {
+	try {
+		return fileURLToPath(new URL("../assets/USAGE.md", import.meta.url));
+	} catch {
+		return;
+	}
+}
 /** usage remote: return the usage markdown document. */
 let UsageRemote = (() => {
 	let _classSuper = TypertRemoteService;
@@ -344,17 +347,13 @@ let UsageRemote = (() => {
 			this.usagePath = usagePath;
 		}
 		async get() {
-			if (this.usagePath) try {
+			const candidates = [this.usagePath, packagedUsagePath()].filter((path) => path !== void 0);
+			for (const candidate of candidates) try {
 				return {
-					markdown: readFileSync(this.usagePath, "utf8"),
+					markdown: readFileSync(candidate, "utf8"),
 					source: "file"
 				};
-			} catch {
-				return {
-					markdown: `# 使用说明\n\n> 无法读取文档文件:${this.usagePath}\n\n${USAGE_PLACEHOLDER}`,
-					source: "placeholder"
-				};
-			}
+			} catch {}
 			return {
 				markdown: USAGE_PLACEHOLDER,
 				source: "placeholder"

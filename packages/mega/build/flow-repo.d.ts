@@ -158,6 +158,13 @@ export interface WriteSeam {
 }
 export declare const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 export declare const DEFAULT_DATABASE = "cm";
+/**
+ * Ensure schema + fixed dsh user exist. Idempotent; safe to run from any repo
+ * construction (version rows skip already-applied migrations). Returns the
+ * names of migrations applied on this run (empty when everything was already
+ * up to date) — used by the panel's「迁移」button to report progress.
+ */
+export declare function runMigrations(pgmas: WriteSeam, database: string, userId: string): Promise<string[]>;
 export interface RepoOptions {
     pgmas: WriteSeam;
     database?: string;

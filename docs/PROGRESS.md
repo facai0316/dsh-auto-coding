@@ -4,7 +4,7 @@
 > 每完成一项就把状态从「未完成」移到「已完成」并更新「最后更新」。
 > 计划明细见 [`docs/plans/`](./plans/00-overview.md)（00 总览 + 01–09 分计划）。
 
-最后更新：2026-08-16（计划 10 打包与分发：P0–P3 实施并验证——mega 单包 + `dsh plugin add` reconcile + git 子目录分发 + skills 外部源）
+最后更新：2026-08-16（v0.3.0 发布：使用说明落地 README/使用说明页 + 「迁移（建表）」按钮 + USAGE.md 随包分发）
 
 ---
 
@@ -262,6 +262,18 @@ ui-requirements 的修改、pnpm-lock.yaml。建议完成 §3.1–3.3 后再提�
   → 包内 `assets/skills/`，新项目免 facai-init。
 - **待办**：本机 web profile 从四独立包切到 mega（§3.1 重启时一并做，见下）；
   推远端 tag 后目标机器一键安装实测；旧四包归档。
+
+### 3.6 ✅ v0.3.0（2026-08-16）：使用说明 + 显式迁移入口
+
+- **使用说明**：完整四步文档（配置数据库 → 技能 → 添加项目 → 登记需求）落地两处——
+  仓库 `README.md` 顶部「快速使用」+ 插件内「自动化看板 → 使用说明」页；
+  文档源文件 `packages/mega/assets/USAGE.md`，`usage remote` 默认读包内文档
+  （经 import.meta.url 定位，随 dist 分发，开箱即用），显式 `usagePath` 仍优先。
+- **「迁移（建表）」按钮**：数据库连接卡片新增显式迁移入口——cm-flow `config`
+  命名空间新增 `migrate` remote（幂等，返回本次应用的迁移列表）；
+  迁移在 repo 构造时本就自动运行，按钮用于改完连接后主动跑一遍看结果/报错。
+  `runMigrations` 已导出并返回 `string[]`。
+- 版本 `0.2.0 → 0.3.0`，dist/mega 重新组装（含 assets/USAGE.md），测试 112/112 绿。
 
 ## 4. 环境速查
 

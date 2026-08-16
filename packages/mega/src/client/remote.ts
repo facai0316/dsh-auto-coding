@@ -118,6 +118,14 @@ export const workerConfigSchema = z.object({
 })
 export type WorkerConfig = z.infer<typeof workerConfigSchema>
 
+/** config/migrate 的返回：ok + 本次实际应用的迁移列表 + 说明。 */
+export const migrationResultSchema = z.object({
+  ok: z.boolean(),
+  applied: z.array(z.string()),
+  message: z.string(),
+})
+export type MigrationResult = z.infer<typeof migrationResultSchema>
+
 export const llmModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -175,6 +183,7 @@ export interface ConfigRemote {
   get(): Promise<RemoteResult<WorkerConfig>>
   set(config: WorkerConfig): Promise<RemoteResult<WorkerConfig>>
   providers(): Promise<RemoteResult<LlmProviderInfo[]>>
+  migrate(): Promise<RemoteResult<MigrationResult>>
 }
 
 /** cm-worker 的 merge Typert Remote：审核大厅「解决冲突」按钮入口。 */
@@ -468,6 +477,15 @@ export const CONTRIBUTION: RemoteContribution = {
       result: codec('@auto-coding/cm-flow#LlmProviderInfo[]', z.array(llmProviderSchema)),
     },
     {
+      id: '@auto-coding/cm-flow#config/migrate',
+      service: 'cmConfig',
+      namespace: 'config',
+      method: 'migrate',
+      invocation: { kind: 'direct' },
+      parameters: [],
+      result: codec('@auto-coding/cm-flow#MigrationResult', migrationResultSchema),
+    },
+    {
       id: '@auto-coding/cm-worker#merge/resolveConflicts',
       service: 'cmMerge',
       namespace: 'merge',
@@ -695,6 +713,11 @@ export const workerConfig = {
   async providers(): Promise<LlmProviderInfo[]> {
     await whenReady()
     return unwrap(await remote!.config.providers())
+  },
+  /** 显式跑一遍 schema 迁移（幂等）。 */
+  async migrate(): Promise<{ ok: boolean; applied: string[]; message: string }> {
+    await whenReady()
+    return unwrap(await remote!.config.migrate())
   },
 }
 
