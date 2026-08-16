@@ -11,7 +11,7 @@
 一条命令装进 web profile（git 分发，零构建）：
 
 ```sh
-dsh plugin --profile web add "git+ssh://git@github.com/facai0316/dsh-auto-coding.git#v0.2.0&path:/dist/mega"
+dsh plugin --profile web add "git+ssh://git@github.com/facai0316/dsh-auto-coding.git#v0.3.2&path:/dist/mega"
 ```
 
 安装后 `dsh.profile.bundles` 自动包含 `@auto-coding/mega`，四个插件行
