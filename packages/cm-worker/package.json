@@ -20,6 +20,7 @@
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-agent": "^0.1.0-rc.5",
     "@deepseek-ai/dsh-subagent": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.5",
     "@deepseek-ai/schemastery": "^1.0.0"
   },
   "devDependencies": {
@@ -29,6 +30,7 @@
     "@deepseek-ai/cordis": "link:/root/workspace/deepseek-harness/vendor/cordis",
     "@deepseek-ai/dsh-agent": "link:/root/workspace/deepseek-harness/packages/core/agent",
     "@deepseek-ai/dsh-subagent": "link:/root/workspace/deepseek-harness/packages/subagent/subagent",
+    "@deepseek-ai/dsh-typert-protocol": "link:/root/workspace/deepseek-harness/packages/typert/protocol",
     "@deepseek-ai/schemastery": "link:/root/workspace/deepseek-harness/vendor/schemastery",
     "@types/node": "^26.2.0",
     "@types/pg": "^8.21.0",

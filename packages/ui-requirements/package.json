@@ -25,16 +25,19 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsc -p tsconfig.build.json && tsdown && cp build/index.d.ts lib/index.d.ts",
     "watch": "tsdown --watch",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@douyinfe/semi-ui": "^2.102.0",
+    "marked": "^18.0.9",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-typert-protocol": "^0.1.0-rc.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -42,8 +45,12 @@
     "@deepseek-ai/dsh-client-runtime": "link:/root/workspace/deepseek-harness/packages/client/runtime",
     "@deepseek-ai/dsh-client-ui-conversation": "link:/root/workspace/deepseek-harness/packages/client/ui-conversation",
     "@deepseek-ai/dsh-client-ui-theme": "link:/root/workspace/deepseek-harness/packages/client/ui-theme",
+    "@deepseek-ai/dsh-typert-protocol": "link:/root/workspace/deepseek-harness/packages/typert/protocol",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.21.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
+    "pg": "^8.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tsdown": "^0.22.2"

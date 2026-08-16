@@ -93,6 +93,24 @@ export class WorktreeManager {
     symlinkSync(relative(dirname(wtTarget), repoTarget), wtTarget, 'dir')
   }
 
+  /**
+   * Commit every uncommitted change in the task worktree to its branch.
+   * Pipeline stages（facai-coding 等技能默认不 git commit）留下的未提交产物
+   * 由流水线在阶段成功后兜底提交——否则 merge 的 push 只推已提交内容，PR 会
+   * 漏掉全部代码。无改动时 no-op（返回 false）。target 等已被 .gitignore 排除。
+   */
+  async commitAll(wtPath: string, message: string): Promise<boolean> {
+    this.git(['add', '-A'], wtPath)
+    // diff --cached --quiet 退出码 0 = 无暂存改动（no-op）；非 0 = 有改动（提交）。
+    try {
+      this.git(['diff', '--cached', '--quiet'], wtPath)
+      return false
+    } catch {
+      this.git(['commit', '-m', message], wtPath)
+      return true
+    }
+  }
+
   /** Push the task branch to the remote (run inside the worktree). */
   async push(handle: WorktreeHandle, remote = 'origin'): Promise<void> {
     this.git(['push', '-u', remote, handle.branch], handle.path)
@@ -109,6 +127,16 @@ export class WorktreeManager {
   async remove(handle: WorktreeHandle): Promise<void> {
     this.git(['worktree', 'remove', '--force', handle.path])
     this.git(['branch', '-D', handle.branch])
+  }
+
+  /**
+   * Post-merge sync: switch the primary checkout onto `main` and pull, so the
+   * merged PR lands in the local main branch. `--ff-only` keeps the sync strict
+   * — a diverged local main fails loudly instead of fabricating a merge commit.
+   */
+  async pullMain(branch = 'main'): Promise<void> {
+    this.git(['checkout', branch])
+    this.git(['pull', '--ff-only'])
   }
 
   /** Run git synchronously with args; cwd defaults to the primary checkout. */

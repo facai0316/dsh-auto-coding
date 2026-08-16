@@ -96,7 +96,8 @@ export function uiPluginBundle(id: string): UserConfig[] {
   ]
 }
 
-function clientConfig(id: string): UserConfig {
+/** The shared browser-half config for a UI plugin package. */
+export function clientConfig(id: string): UserConfig {
   return {
     name: `${id}/client`,
     entry: { client: 'src/client/index.ts' },

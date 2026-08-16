@@ -21,7 +21,7 @@ interface Props {
 
 /**
  * 待决策问答弹层：列出某 record 的 pending 问题，逐题作答（选项按钮 /
- * 自由输入），全部答完可关闭。
+ * 自由输入）。答完后请到审核大厅点「审核通过」才会放行续跑。
  */
 export function QuestionModal({ recordId, title, onClose, onAnswered }: Props): ReactElement {
   const [items, setItems] = useState<Question[]>([])

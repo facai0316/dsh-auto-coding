@@ -15,6 +15,7 @@
 | D4 | 问答续跑 | **新开会话**，靠落盘产物 + 你的答复重建上下文 |
 | D5 | 轮询 | 全轮询无监听；子会话结束用 `await` 阻塞等待 |
 | D6 | 数据模型 | `projects` 表；`records.status` 加 `waiting_reply`；新增 `ask_user_questions`（含 `answer` 字段） |
+| D7 | 人工审核门 | **ADR（decision）与 plan 产物生成后先挂 `waiting_review` 审核门**，审核大厅通过才进下一阶段；驳回必须填整改意见，worker 复用同一 record 携反馈重跑；`waiting_reply` 需**全部作答 + 审核通过**才放行续跑；新增 `reviews` 表（kind: review/reply）+ `records.status` 加 `waiting_review` |
 
 ---
 
@@ -67,6 +68,7 @@ create index on requirements(project_id) where status = 'open';
 | **`merging`**（新增） | PR 已建，等你手动合并 |
 | `done` | 你点「已合并」、worker 收尾完成 |
 | `cancelled` | 取消 |
+| **`terminated`**（新增，不可逆） | 人工终止：需求及所有未完成 record 标记终止，worker 每阶段开始前检查并停止 |
 
 ### 2.3 `records.status` 扩展
 
@@ -75,7 +77,9 @@ create index on requirements(project_id) where status = 'open';
 | `running` | 阶段会话执行中 |
 | `success` | 阶段完成 |
 | `failed` | 阶段失败（可重试） |
-| **`waiting_reply`**（新增） | 阶段挂起，等回答 `ask_user_questions` |
+| **`waiting_reply`**（新增） | 阶段挂起，等回答 `ask_user_questions`（答完 + 审核大厅放行后续跑） |
+| **`waiting_review`**（新增） | 阶段产物（ADR/plan）挂起，等人工审核（通过→下一阶段；驳回带整改意见→携反馈重跑） |
+| **`terminated`**（新增） | 需求被人工终止时，未完成阶段 record 一并标记终止 |
 
 ### 2.4 `ask_user_questions`（records 子表）
 
@@ -93,7 +97,27 @@ create table if not exists ask_user_questions (
 create index on ask_user_questions(record_id) where status = 'pending';
 ```
 
-### 2.5 迁移清单（cm-flow `_cm_flow_migrations`）
+### 2.5 `reviews`（审核单，v7 迁移）
+
+```sql
+create table if not exists reviews (
+  id          uuid primary key default gen_random_uuid(),
+  record_id   uuid not null references records(id) on delete cascade,
+  kind        varchar not null default 'review',   -- 'review'=人工审核门 | 'reply'=待决策放行
+  status      varchar not null default 'pending',  -- pending | approved | rejected
+  feedback    text,                                -- 驳回时的整改意见
+  created_at  timestamptz not null default now(),
+  decided_at  timestamptz
+);
+create index on reviews(record_id) where status = 'pending';
+```
+
+- 每次「重跑后再次挂起」都会挂一张**新** pending 单（驳回/通过按 record 的最新单判断），
+  审核历史完整可审计。
+- `waiting_reply` 记录挂 kind='reply' 的放行单：**全部问题作答完毕才能点「审核通过」**，
+  worker 只放行「最新单 approved 且无 pending 问题」的记录。
+
+### 2.6 迁移清单（cm-flow `_cm_flow_migrations`）
 
 | version | 内容 |
 |---|---|
@@ -101,6 +125,9 @@ create index on ask_user_questions(record_id) where status = 'pending';
 | v2 | 建 `projects` 表 |
 | v3 | `requirements.project_id` + 索引 |
 | v4 | 建 `ask_user_questions` 表 + 索引 |
+| v5 | `worker_config` 单例行 |
+| v6 | `records.retry_count` |
+| v7 | 建 `reviews` 表 + pending 索引 |
 
 （`requirements.status`/`records.status` 枚举扩展为 varchar 取值，无 DDL，由代码文档固化）
 
@@ -140,14 +167,31 @@ create index on ask_user_questions(record_id) where status = 'pending';
 
 ## 4. worker 调度
 
+### 4.0 并发（配置页可设）
+
+- `worker_config.concurrency`（1–8，默认 1 = 串行；配置页「并发」卡片）是**全局并发
+  预算**：同时运行的流水线任务数（领取的需求 + 审核放行/驳回的续跑 + 失败重试 +
+  冲突解决）不超过该值。
+- tick 是**短派发循环**（每 10s 一轮，只做快查询与派发，不阻塞在长流水线上）：
+  1. **领取**：按剩余槽位逐个原子领取 `open` 需求（`for update skip locked` 互斥），
+     各自以后台任务跑阶段链；
+  2. **审核续跑**：`listActionableReviews` 取齐已 approved/rejected 的挂起记录，
+     按剩余槽位逐个后台续跑（多记录可并行）；驳回走携整改意见重跑；
+  3. **重试**：`failed` 且 `retry_count < maxRetries` 的 record 按剩余槽位逐个后台重跑；
+  4. **收尾**：`finalizeMerged` 清理已 done 需求的 worktree（短操作，串行）。
+- 槽位在流水线**挂起（进人工审核门/等待回复）或完成时释放**，下一轮（≤10s）即补新
+  任务——审核放行逐条到来也能并发续跑，不再要求「一轮内审完所有记录」。
+- 冲突解决（merge 阶段按钮触发）也走同一预算：预算满时排队，槽位空出即跑。
+- 并发需求各自独立 worktree/分支（§7.2），互不干扰；stage 子会话可并行。
+
 ### 4.1 轮询清单（timer，10s 一档）
 
 | 轮询 | 触发条件 | 动作 |
 |---|---|---|
-| 领取任务 | `requirements.status='open'` | 乐观锁领取 → `in_progress`，建 worktree + 首条 record |
-| 续跑决策 | record `waiting_reply` 且 questions 全 answered | 组装答复 → 新开会话续跑 |
-| 重试失败 | record `failed` 且重试 < 上限 | 重置重跑 |
-| 收尾确认 | `requirement.status='merging'` 且你点「已合并」 | 校验 PR → 删分支/worktree → `done` |
+| 领取任务 | `requirements.status='open'` | 乐观锁领取 → `in_progress`，建 worktree + 首条 record（并发条数见 §4.0） |
+| 续跑决策 | record `waiting_review`/`waiting_reply` 且最新审核单 approved/rejected | 按预算后台续跑（stage / merge / resolve 各按 category 分流；多记录可并行） |
+| 重试失败 | record `failed` 且重试 < 上限 | 按预算后台重跑 |
+| 收尾确认 | `requirement.status='merging'` 且你点「已合并」 | 校验 PR → 主 checkout pull main → 删分支/worktree → `done` |
 | 面板同步 | 面板轮询 remote | 返回含阶段/待决策/PR 链接的列表 |
 
 ### 4.2 任务领取（乐观锁）
@@ -167,9 +211,9 @@ returning r.id, r.project_id, r.title, r.description
 
 ### 4.3 状态机
 
-**requirement**：`draft → open → in_progress → merging → done`（`cancelled` 任意非终态可达）
+**requirement**：`draft → open → in_progress → merging → done`（`cancelled` / **`terminated`（不可逆）** 任意非终态可达；`terminated` 无任何出路）
 
-**record**：`running → success | failed | waiting_reply`
+**record**：`running → success | failed | waiting_reply | waiting_review | terminated`
 
 ---
 
@@ -177,15 +221,19 @@ returning r.id, r.project_id, r.title, r.description
 
 | 顺序 | category | skill | 输入 | 产物（worktree 内） | 决策点 |
 |---|---|---|---|---|---|
-| 1 | `decision` | facai-decision | 需求 + 现状 | `decisions/{n}-*.md` + 索引 | **ADR 方案 A/B → waiting_reply** |
-| 2 | `plan` | facai-plan | 需求 + ADR + 架构 | `docs/plans/{n}-*/` | — |
-| 3 | `review-plan` | facai-review（审计划） | 计划 + 架构/规则 | 审核结论 | **计划冲突 → waiting_reply** |
+| 1 | `decision` | facai-decision | 需求 + 现状 | `decisions/{n}-*.md` + 索引 | **ADR 方案 A/B → waiting_reply；成功后挂 waiting_review 人工审核门** |
+| 2 | `plan` | facai-plan | 需求 + ADR + 架构 | `docs/plans/{n}-*/` | —（人审延后到 review-plan 之后） |
+| 3 | `review-plan` | facai-review（审计划） | 计划 + 架构/规则 | 审核结论 | 计划冲突 → waiting_reply；**成功后 plan 挂 waiting_review 人工审核门（先机审、后人审）** |
 | 4 | `coding` | facai-coding（**含 facai-selfcheck 闭环**） | 计划 + 现有代码 | 代码 + 测试（自检通过） | — |
 | 5 | `contract` | facai-contract | 变更 + spec/ | `spec/` 更新 | **契约语义 → waiting_reply** |
 | 6 | `review-code` | facai-review（审代码） | 代码 + 规则/spec | 审核修正（冲突直改） | — |
 | 7 | `merge` | agent 任务（建 PR 指令，见 §8） | 任务分支 | push + PR | PR 合并冲突/未配 token → waiting_reply |
 
 > `review-plan`/`review-code` 是同一 `facai-review` skill 的两次调用，category 用不同值区分记账。
+> 人工审核门两档（pipeline.ts 可调）：`REVIEW_GATED = ['decision']` 立即门；
+> `DEFERRED_REVIEW_GATES = [{category:'plan', anchor:'review-plan'}]` 延后门——
+> plan 人审在机审（review-plan）成功之后挂到 plan record，通过后从 coding 继续，
+> 驳回则 plan 携整改意见重跑 → 重新机审 → 再次人审。
 
 ### 5.1 阶段上下文组装（每阶段会话 prompt）
 
@@ -209,12 +257,27 @@ returning r.id, r.project_id, r.title, r.description
 
 ---
 
-## 6. 决策通道（waiting_reply + ask_user_questions）
+## 6. 决策通道（waiting_reply + ask_user_questions + 审核大厅）
 
-- **挂起**：阶段会话 report 返回 `questions:[{question, options}]` → worker 落库（record=waiting_reply + questions pending）→ 会话结束，worktree/未提交改动保留
-- **面板**：卡片「待决策」徽标 → 问答弹层（选项按钮 / 自由输入）→ 逐题 `answer`
-- **答复写回**：`questions.answer({questionId, answer})`
-- **续跑**：worker 下轮轮询发现全 answered → 组装上下文 → **新开会话**续跑（D4）
+- **挂起**：阶段会话 report 返回 `questions:[{question, options}]` → worker 落库
+  （record=waiting_reply + questions pending + 一张 kind='reply' 放行单）→ 会话结束，
+  worktree/未提交改动保留。
+- **ask_user 兼容**：阶段子代理中 `ask_user_question` 工具不可用（被拒），
+  阶段 prompt 显式引导模型把待问问题放进结构化结果 `questions` 字段 → 走同一挂起通道。
+  所有阶段 prompt 均要求**批量提问**：不要遇到一个问题问一个——遇到问题先攒下并继续
+  推理，把所有问题过一遍，确认没有其他问题要确认了，再一次性发（`questions` 一次给全）。
+- **审核大厅（面板「审核」tab）**：
+  - **待审核**：`waiting_review` 记录（ADR/plan 产物）→「通过」或「驳回」（必填整改意见）；
+  - **待决策**：`waiting_reply` 记录 → 逐题 `answer`，**全部答完才能点「审核通过」**放行；
+  - **待合并**：merging 需求的 PR 链接 + 「解决冲突」+ 「已合并」（见 §8.1）。
+- **答复写回**：`questions.answer({questionId, answer})`；放行 `reviews.approve({id})`；
+  驳回 `reviews.reject({id, feedback})`。
+- **续跑**：worker 每 tick 轮询 `listActionableReviews()`（`processReviews()` 的派发源）——
+  审核门 approved → record 置 success + 进下一阶段；reply 单 approved 且全作答 → 复用
+  record 携答复**新开会话**续跑（stage → runPipeline 续跑、merge → runMerge、
+  resolve → runResolve，按 category 分流）；任一最新单 rejected → 复用 record 携整改意见
+  **新开会话**重跑同阶段。多个已放行/驳回的记录按全局并发预算（§4.0）**并行**续跑，
+  不再串行阻塞 tick——逐条放行也能并发。
 
 ---
 
@@ -231,12 +294,17 @@ returning r.id, r.project_id, r.title, r.description
 ```
 领取：git -C <repo> worktree add <wt> -b req-<id> <base: origin/main>
 阶段：会话 cwd = <wt>；产物提交到 req-<id> 分支
+     （worker 每阶段以 worktree 为 cwd 新建 parent agent，并把子会话
+       sandbox/mode 放宽到 danger-full-access——git worktree 的 commit/push
+       会写主仓 .git，workspace-write 会被文件沙箱拒绝；见 §11 权限边界）
 收尾（merge 阶段）：
   git -C <repo> push -u origin req-<id>
   调 Gitee API 建 PR（base=main, head=req-<id>）→ 记 PR 链接/号到 records.artifacts
   requirement.status = 'merging'
 你手动合并 PR 后 → 面板点「已合并」→ worker：
-  校验 PR 已合并 → git branch -D req-<id> → git worktree remove --force <wt>
+  校验 PR 已合并 → git -C <repo> checkout main && git pull（主 checkout 同步
+  合并提交；失败则下轮 tick 重试，直到成功）→ git branch -D req-<id>
+  → git worktree remove --force <wt>
   requirement.status = 'done'
 ```
 
@@ -263,7 +331,10 @@ PR 建立**不硬编码在 worker**，做成一个 merge 阶段的 agent 子任�
 **凭证**（PAT，只能手动生成，故面板输入）：
 - Gitee：设置 → 私人令牌，`Authorization: token <PAT>`
 - Gitea：设置 → 应用 → 生成令牌，`Authorization: token <PAT>`
-- token 存 `projects.pr_token`，worker 以环境变量 `PR_TOKEN` 注入会话（bash env），不写进 prompt 正文
+- token 存 `projects.pr_token`；注入方式：**直接写进 merge 阶段指令正文**（实测：子进程
+  环境会做凭据清洗（`/KEY|PASSWORD|SECRET|TOKEN/i`）、`shellEnv` 只放行 `DSH_*` 键，
+  环境变量通道在本部署不可用）。prompt 明确约束 token 只用于 Authorization 头、
+  不得写入 git/records/输出回显。个人本地部署接受该暴露面（§11 已同步更新）。
 
 **指导指令（merge 阶段 agent prompt 核心）**：
 ```
@@ -281,6 +352,24 @@ PR 建立**不硬编码在 worker**，做成一个 merge 阶段的 agent 子任�
 - `is_ok=true` → 记 `pr_url` 到 records.artifacts → `requirement.status='merging'`
 - `is_ok=false` 或未配 token → record `waiting_reply`，附问题让你补 token / 手动建 PR 后点「已合并」
 
+### 8.1 解决冲突（merging 阶段的用户按钮）
+
+PR 已建（`merging`）后若平台合并期出现冲突，审核大厅「待我合并」卡片（及需求卡）
+提供 **「解决冲突」** 按钮 → `merge` Typert Remote（cm-worker 的 `MergeService`）
+→ `WorkerPipeline.startResolve`：
+
+1. 校验需求处于 `merging`；幂等（已有 running/waiting_reply 的 resolve record 直接返回）；
+   落一条 `category='resolve'` 的 running record（分支 = 该需求最早带 branch 的 record）。
+2. 后台起跑 resolve 会话（同一 SubagentStageExecutor，cwd=任务 worktree）：
+   `git fetch origin` → `git merge origin/main` → 逐个解决冲突（保留任务分支意图、兼容远端
+   改动，不确定处攒下不中断）→ `git add -A && git commit -m "resolve merge conflicts with origin/main"`
+   → `git push`（被拒则 `pull --rebase` 后重试）。
+3. 需要用户决策 → `questions` 批量返回（**不要遇到一个问题问一个，攒齐后一次性发**）→
+   走 §6 同一挂起通道：waiting_reply + ask_user_questions + reply 放行单；答完 + 审核通过后
+   worker 复用同一 resolve record 携答复续跑（工作区已解决的冲突保留，续跑完成 commit+push）。
+4. 成功 → resolve record success（需求仍 merging，PR 已随推送更新，你确认合并后点「已合并」）；
+   失败 → resolve record failed（可再次点「解决冲突」重试或手动处理后点「已合并」）。
+
 ---
 
 ## 9. 面板升级（流水线控制台）
@@ -288,10 +377,12 @@ PR 建立**不硬编码在 worker**，做成一个 merge 阶段的 agent 子任�
 | 能力 | 实现 |
 |---|---|
 | 卡片阶段时间线 | `requirements.list` 返回关联 records（category/status/时间）折叠展示 |
-| 状态徽标 | running/success/failed/waiting_reply 着色；`merging` 显示 PR 链接 |
-| 待决策问答弹层 | 卡片「待决策」→ Modal 逐题问答（§6） |
+| 状态徽标 | running/success/failed/waiting_reply/waiting_review 着色；`merging` 显示 PR 链接 |
+| **审核大厅** | 「审核」tab 聚合：待审核（通过/驳回+整改意见）、待决策（逐题作答 + 答完「审核通过」放行）、待合并（PR + 解决冲突 + 已合并） |
+| 待决策问答弹层 | 需求卡片「待决策」→ Modal 逐题问答（答题后需在审核大厅放行） |
 | 提交执行 | 勾选/「开始执行」→ `transition('open')` |
 | 已合并确认 | `merging` 卡片 → 「已合并」按钮 → 触发收尾 |
+| 解决冲突 | `merging` 卡片/需求卡 → 「解决冲突」按钮 → `merge.resolveConflicts` → resolve 会话（§8.1） |
 | 项目筛选 | 顶栏 projects 筛选 |
 
 remote 面扩展（cm-flow）：
@@ -300,6 +391,7 @@ projects.list / projects.create({name, localPath, gitUrl, platform, prToken?})
 requirements.list({projectId?})          # 含阶段折叠
 requirements.confirmMerged({requirementId})
 questions.list({recordId}) / questions.answer({questionId, answer})
+reviews.list() / reviews.approve({id}) / reviews.reject({id, feedback})
 ```
 
 ---
@@ -317,7 +409,8 @@ questions.list({recordId}) / questions.answer({questionId, answer})
 
 - 写库全走 cm-flow（`pgmas.withClient`）；`pg_query` 模型工具保持只读
 - worktree/git 操作 worker 内部封装（命令白名单），不暴露给模型；PR 建交 agent 任务但经指导指令 + JSON 契约约束
-- `pr_token` 明文存 `projects` 表（个人部署可接受）；仅经环境变量注入 merge 会话，不进 prompt 正文、不进 git、不进 records
+- `pr_token` 明文存 `projects` 表（个人部署可接受）；注入 merge 阶段指令正文（本地部署
+  接受该暴露面），prompt 约束只用于 Authorization 头、不进 git、不进 records、不回显
 - 阶段会话权限 = 本机 bash/fs（与手动跑 skill 等价），worktree 限制只改任务分支
 - 决策只经面板通道；任何智能体不得自行替用户回答
 

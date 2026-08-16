@@ -29,11 +29,16 @@ import {
   ProjectsRepo,
   QuestionsRepo,
   RequirementsRepo,
+  ReviewsRepo,
+  WorkerConfigRepo,
   type ProjectView,
   type QuestionView,
+  type RecordListItem,
   type RecordView,
   type RequirementView,
   type RequirementWithStages,
+  type ReviewView,
+  type WorkerConfig,
 } from './repo.ts'
 
 export type {
@@ -43,19 +48,45 @@ export type {
   RequirementWithStages,
   StageSummary,
   RecordView,
+  RecordListItem,
   RecordInput,
   ProjectView,
   QuestionView,
+  ReviewKind,
+  ReviewStatus,
+  ReviewView,
   WriteSeam,
   RepoOptions,
+  WorkerConfig,
+  StageModelConfig,
 } from './repo.ts'
+
+/** 一个 LLM 模型的目录条目（面板下拉用）。 */
+export interface LlmModelInfo {
+  id: string
+  name: string
+}
+
+/** 一个已注册 LLM 提供商及其模型目录（面板下拉用）。 */
+export interface LlmProviderInfo {
+  id: string
+  name: string
+  models: LlmModelInfo[]
+}
 export {
   REQUIREMENT_STATUSES,
   RECORD_STATUSES,
+  REVIEW_KINDS,
+  REVIEW_STATUSES,
   TRANSITIONS,
   RequirementsRepo,
   ProjectsRepo,
   QuestionsRepo,
+  ReviewsRepo,
+  WorkerConfigRepo,
+  DEFAULT_WORKER_CONFIG,
+  MAX_CONCURRENCY,
+  normalizeWorkerConfig,
   assertStatus,
   assertRecordStatus,
   canTransition,
@@ -100,6 +131,9 @@ export default class CmFlowService extends TypertRemoteService {
     // Sibling namespaces share the same write seam and migration gate.
     new ProjectsService(ctx, new ProjectsRepo({ pgmas, database, userId }))
     new QuestionsService(ctx, new QuestionsRepo({ pgmas, database, userId }))
+    new ReviewsService(ctx, new ReviewsRepo({ pgmas, database, userId }))
+    new RecordsService(ctx, this.repo)
+    new ConfigService(ctx, new WorkerConfigRepo({ pgmas, database, userId }))
   }
 
   @Remote('list')
@@ -121,6 +155,16 @@ export default class CmFlowService extends TypertRemoteService {
   async confirmMerged(id: string): Promise<RequirementView> {
     return this.repo.confirmMerged(id)
   }
+
+  @Remote('update')
+  async update(id: string, title?: string, description?: string | null, projectId?: string | null): Promise<RequirementView> {
+    return this.repo.updateRequirement(id, { title, description, projectId })
+  }
+
+  @Remote('delete')
+  async delete(id: string): Promise<void> {
+    return this.repo.removeRequirement(id)
+  }
 }
 
 /** Typert Remote service (namespace `projects`). */
@@ -141,6 +185,16 @@ export class ProjectsService extends TypertRemoteService {
   async create(name: string, localPath: string, gitUrl: string, platform: string, prToken?: string): Promise<ProjectView> {
     return this.repo.create({ name, localPath, gitUrl, platform, prToken })
   }
+
+  @Remote('update')
+  async update(id: string, name?: string, localPath?: string, gitUrl?: string, platform?: string, prToken?: string | null): Promise<ProjectView> {
+    return this.repo.update(id, { name, localPath, gitUrl, platform, prToken })
+  }
+
+  @Remote('delete')
+  async delete(id: string): Promise<void> {
+    return this.repo.remove(id)
+  }
 }
 
 /** Typert Remote service (namespace `questions`). */
@@ -160,6 +214,118 @@ export class QuestionsService extends TypertRemoteService {
   @Remote('answer')
   async answer(questionId: string, answer: string): Promise<QuestionView> {
     return this.repo.answer(questionId, answer)
+  }
+}
+
+/** Typert Remote service (namespace `reviews`): 审核大厅的审核单操作。 */
+export class ReviewsService extends TypertRemoteService {
+  private readonly repo: ReviewsRepo
+
+  constructor(ctx: Context, repo: ReviewsRepo) {
+    super(ctx, 'cmReviews', { namespace: 'reviews' })
+    this.repo = repo
+  }
+
+  /** 全部 pending 审核单（含关联 record/需求信息），审核大厅数据源。 */
+  @Remote('list')
+  async list(): Promise<ReviewView[]> {
+    return this.repo.listPending()
+  }
+
+  @Remote('approve')
+  async approve(id: string): Promise<ReviewView> {
+    return this.repo.approve(id)
+  }
+
+  @Remote('reject')
+  async reject(id: string, feedback: string): Promise<ReviewView> {
+    return this.repo.reject(id, feedback)
+  }
+}
+
+/** Typert Remote service (namespace `records`): 运行页列表/删除。 */
+export class RecordsService extends TypertRemoteService {
+  private readonly repo: RequirementsRepo
+
+  constructor(ctx: Context, repo: RequirementsRepo) {
+    super(ctx, 'cmRecords', { namespace: 'records' })
+    this.repo = repo
+  }
+
+  @Remote('list')
+  async list(category?: string, requirementId?: string, status?: string): Promise<RecordListItem[]> {
+    return this.repo.listRecords({
+      category,
+      requirementId,
+      status: status === undefined ? undefined : (status as RecordListItem['status']),
+    })
+  }
+
+  @Remote('create')
+  async create(requirementId: string, category: string, status: string, result?: string): Promise<RecordListItem> {
+    const created = await this.repo.appendRecord({
+      requirementId,
+      category,
+      status: status as RecordListItem['status'],
+      result,
+    })
+    return this.repo.getRecordListItem(created.id)
+  }
+
+  @Remote('update')
+  async update(id: string, status?: string, result?: string): Promise<RecordListItem> {
+    await this.repo.updateRecord(id, {
+      status: status === undefined ? undefined : (status as RecordListItem['status']),
+      result: result === undefined ? undefined : result,
+    })
+    return this.repo.getRecordListItem(id)
+  }
+
+  @Remote('delete')
+  async delete(id: string): Promise<void> {
+    return this.repo.removeRecord(id)
+  }
+}
+
+/** Typert Remote service (namespace `config`): worker 运行配置读写 + LLM 目录。 */
+export class ConfigService extends TypertRemoteService {
+  private readonly repo: WorkerConfigRepo
+
+  constructor(ctx: Context, repo: WorkerConfigRepo) {
+    super(ctx, 'cmConfig', { namespace: 'config' })
+    this.repo = repo
+  }
+
+  @Remote('get')
+  async get(): Promise<WorkerConfig> {
+    return this.repo.get()
+  }
+
+  @Remote('set')
+  async set(config: WorkerConfig): Promise<WorkerConfig> {
+    return this.repo.set(config)
+  }
+
+  /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
+  @Remote('providers')
+  async providers(): Promise<LlmProviderInfo[]> {
+    const llm = this.ctx.get('llm') as {
+      listProviders(): { id: string; name?: string }[]
+      listModels(provider: string): Promise<{ id: string; name: string }[]>
+    } | undefined
+    if (llm === undefined) return []
+    const providers: LlmProviderInfo[] = []
+    for (const provider of llm.listProviders()) {
+      let models: LlmModelInfo[] = []
+      try {
+        models = (await llm.listModels(provider.id)).map(model => ({ id: model.id, name: model.name ?? model.id }))
+      } catch {
+        // 目录不可用（未实现 listModels 等）→ 该提供商无模型选项。
+        models = []
+      }
+      providers.push({ id: provider.id, name: provider.name ?? provider.id, models })
+    }
+    return providers
   }
 }
 

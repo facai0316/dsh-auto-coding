@@ -1,99 +1,95 @@
-import { useCallback, useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import Button from '@douyinfe/semi-ui/lib/es/button'
 import Input from '@douyinfe/semi-ui/lib/es/input'
 import Modal from '@douyinfe/semi-ui/lib/es/modal'
 import Select from '@douyinfe/semi-ui/lib/es/select'
-import Tag from '@douyinfe/semi-ui/lib/es/tag'
 import Typography from '@douyinfe/semi-ui/lib/es/typography'
 import classes from './RequirementsPanel.module.css'
-import { projects, type Project } from './remote.ts'
+import type { Project } from './remote.ts'
 
-function messageOf(cause: unknown): string {
-  if (cause instanceof Error) return cause.message
-  return String(cause)
+export interface ProjectInput {
+  name: string
+  localPath: string
+  gitUrl: string
+  platform: 'gitee' | 'gitea'
+  prToken?: string
 }
 
 interface Props {
   visible: boolean
+  /** 传入则进入编辑模式（预填字段），否则为新建。 */
+  initial?: Project | null
   busy: boolean
   onClose: () => void
-  onChanged: () => void
+  onSubmit: (input: ProjectInput) => Promise<void>
 }
 
-/** 项目管理：项目列表 + 新建项目（name/localPath/gitUrl/platform/prToken）。 */
-export function ProjectManager({ visible, busy, onClose, onChanged }: Props): ReactElement {
-  const [list, setList] = useState<Project[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+/**
+ * 项目表单（新建 / 编辑复用）：name / localPath / gitUrl / platform / prToken。
+ * 编辑模式 prToken 留空表示不修改（undefined 透传，host 保持原值）。
+ */
+export function ProjectFormModal({ visible, initial = null, busy, onClose, onSubmit }: Props): ReactElement {
   const [name, setName] = useState('')
   const [localPath, setLocalPath] = useState('')
   const [gitUrl, setGitUrl] = useState('')
   const [platform, setPlatform] = useState<'gitee' | 'gitea'>('gitee')
   const [prToken, setPrToken] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
+  useEffect(() => {
+    if (!visible) return
     setError(null)
-    try {
-      setList(await projects.list())
-    } catch (cause) {
-      setError(messageOf(cause))
-    } finally {
-      setLoading(false)
+    if (initial !== null && initial !== undefined) {
+      setName(initial.name)
+      setLocalPath(initial.localPath)
+      setGitUrl(initial.gitUrl)
+      setPlatform(initial.platform)
+      setPrToken('')
+    } else {
+      setName('')
+      setLocalPath('')
+      setGitUrl('')
+      setPlatform('gitee')
+      setPrToken('')
     }
-  }, [])
+  }, [visible, initial])
 
-  useEffect(() => { if (visible) void refresh() }, [visible, refresh])
-
-  const submit = useCallback(async () => {
-    if (busy) return
+  const submit = async (): Promise<void> => {
     setError(null)
     try {
-      await projects.create({
+      await onSubmit({
         name: name.trim(),
         localPath: localPath.trim(),
         gitUrl: gitUrl.trim(),
         platform,
+        // 编辑模式留空 → 不传 prToken（保持原值）；新建模式留空 → 不配置
         prToken: prToken.trim() === '' ? undefined : prToken.trim(),
       })
-      setName('')
-      setLocalPath('')
-      setGitUrl('')
-      setPrToken('')
-      await refresh()
-      onChanged()
     } catch (cause) {
-      setError(messageOf(cause))
+      setError(cause instanceof Error ? cause.message : String(cause))
     }
-  }, [busy, name, localPath, gitUrl, platform, prToken, refresh, onChanged])
+  }
 
   return (
     <Modal
-      title="项目管理"
+      title={initial === null || initial === undefined ? '新增项目' : `编辑项目：${initial.name}`}
       visible={visible}
       onCancel={onClose}
       maskClosable={false}
       footer={(
-        <Button theme="borderless" disabled={busy} onClick={onClose}>关闭</Button>
+        <>
+          <Button theme="borderless" disabled={busy} onClick={onClose}>取消</Button>
+          <Button
+            theme="solid"
+            disabled={name.trim() === '' || localPath.trim() === '' || gitUrl.trim() === '' || busy}
+            onClick={() => { void submit() }}
+          >
+            {initial === null || initial === undefined ? '创建' : '保存'}
+          </Button>
+        </>
       )}
     >
       {error !== null && <Typography.Text type="danger" size="small">{error}</Typography.Text>}
-      {loading
-        ? <div className={classes.center}><Typography.Text type="tertiary">加载中…</Typography.Text></div>
-        : (
-          <div className={classes.projectList}>
-            {list.map(project => (
-              <div key={project.id} className={classes.projectRow}>
-                <div>
-                  <div className={classes.projectRowName}>{project.name}</div>
-                  <div className={classes.projectRowPath}>{project.localPath}</div>
-                </div>
-                <Tag size="small" color={project.platform === 'gitee' ? 'red' : 'blue'}>{project.platform}</Tag>
-                <Tag size="small" color={project.hasToken ? 'green' : 'grey'}>{project.hasToken ? '已配 token' : '无 token'}</Tag>
-              </div>
-            ))}
-          </div>
-        )}
       <div className={classes.form}>
         <div className={classes.formField}>
           <label>名称</label>
@@ -120,12 +116,9 @@ export function ProjectManager({ visible, busy, onClose, onChanged }: Props): Re
           />
         </div>
         <div className={classes.formField}>
-          <label>PR Token（可选，建 PR 用）</label>
+          <label>PR Token{initial !== null && initial !== undefined ? '（留空保持不变）' : ''}</label>
           <Input value={prToken} onChange={(value) => { setPrToken(value) }} placeholder="个人访问令牌" type="password" />
         </div>
-        <Button theme="solid" disabled={name.trim() === '' || localPath.trim() === '' || gitUrl.trim() === '' || busy} onClick={() => { void submit() }}>
-          新建项目
-        </Button>
       </div>
     </Modal>
   )

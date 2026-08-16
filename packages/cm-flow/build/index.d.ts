@@ -21,9 +21,20 @@
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import { ProjectsRepo, QuestionsRepo, type ProjectView, type QuestionView, type RecordView, type RequirementView, type RequirementWithStages } from './repo.ts';
-export type { RequirementStatus, RecordStatus, RequirementView, RequirementWithStages, StageSummary, RecordView, RecordInput, ProjectView, QuestionView, WriteSeam, RepoOptions, } from './repo.ts';
-export { REQUIREMENT_STATUSES, RECORD_STATUSES, TRANSITIONS, RequirementsRepo, ProjectsRepo, QuestionsRepo, assertStatus, assertRecordStatus, canTransition, DEFAULT_DATABASE, DEFAULT_USER_ID, } from './repo.ts';
+import { ProjectsRepo, QuestionsRepo, RequirementsRepo, ReviewsRepo, WorkerConfigRepo, type ProjectView, type QuestionView, type RecordListItem, type RecordView, type RequirementView, type RequirementWithStages, type ReviewView, type WorkerConfig } from './repo.ts';
+export type { RequirementStatus, RecordStatus, RequirementView, RequirementWithStages, StageSummary, RecordView, RecordListItem, RecordInput, ProjectView, QuestionView, ReviewKind, ReviewStatus, ReviewView, WriteSeam, RepoOptions, WorkerConfig, StageModelConfig, } from './repo.ts';
+/** 一个 LLM 模型的目录条目（面板下拉用）。 */
+export interface LlmModelInfo {
+    id: string;
+    name: string;
+}
+/** 一个已注册 LLM 提供商及其模型目录（面板下拉用）。 */
+export interface LlmProviderInfo {
+    id: string;
+    name: string;
+    models: LlmModelInfo[];
+}
+export { REQUIREMENT_STATUSES, RECORD_STATUSES, REVIEW_KINDS, REVIEW_STATUSES, TRANSITIONS, RequirementsRepo, ProjectsRepo, QuestionsRepo, ReviewsRepo, WorkerConfigRepo, DEFAULT_WORKER_CONFIG, MAX_CONCURRENCY, normalizeWorkerConfig, assertStatus, assertRecordStatus, canTransition, DEFAULT_DATABASE, DEFAULT_USER_ID, } from './repo.ts';
 export interface Config {
     database: string;
     userId: string;
@@ -44,6 +55,8 @@ export default class CmFlowService extends TypertRemoteService {
     create(title: string, description?: string, projectId?: string): Promise<RequirementView>;
     transition(id: string, to: string): Promise<RequirementView>;
     confirmMerged(id: string): Promise<RequirementView>;
+    update(id: string, title?: string, description?: string | null, projectId?: string | null): Promise<RequirementView>;
+    delete(id: string): Promise<void>;
 }
 /** Typert Remote service (namespace `projects`). */
 export declare class ProjectsService extends TypertRemoteService {
@@ -51,6 +64,8 @@ export declare class ProjectsService extends TypertRemoteService {
     constructor(ctx: Context, repo: ProjectsRepo);
     list(): Promise<ProjectView[]>;
     create(name: string, localPath: string, gitUrl: string, platform: string, prToken?: string): Promise<ProjectView>;
+    update(id: string, name?: string, localPath?: string, gitUrl?: string, platform?: string, prToken?: string | null): Promise<ProjectView>;
+    delete(id: string): Promise<void>;
 }
 /** Typert Remote service (namespace `questions`). */
 export declare class QuestionsService extends TypertRemoteService {
@@ -58,5 +73,32 @@ export declare class QuestionsService extends TypertRemoteService {
     constructor(ctx: Context, repo: QuestionsRepo);
     list(recordId: string): Promise<QuestionView[]>;
     answer(questionId: string, answer: string): Promise<QuestionView>;
+}
+/** Typert Remote service (namespace `reviews`): 审核大厅的审核单操作。 */
+export declare class ReviewsService extends TypertRemoteService {
+    private readonly repo;
+    constructor(ctx: Context, repo: ReviewsRepo);
+    /** 全部 pending 审核单（含关联 record/需求信息），审核大厅数据源。 */
+    list(): Promise<ReviewView[]>;
+    approve(id: string): Promise<ReviewView>;
+    reject(id: string, feedback: string): Promise<ReviewView>;
+}
+/** Typert Remote service (namespace `records`): 运行页列表/删除。 */
+export declare class RecordsService extends TypertRemoteService {
+    private readonly repo;
+    constructor(ctx: Context, repo: RequirementsRepo);
+    list(category?: string, requirementId?: string, status?: string): Promise<RecordListItem[]>;
+    create(requirementId: string, category: string, status: string, result?: string): Promise<RecordListItem>;
+    update(id: string, status?: string, result?: string): Promise<RecordListItem>;
+    delete(id: string): Promise<void>;
+}
+/** Typert Remote service (namespace `config`): worker 运行配置读写 + LLM 目录。 */
+export declare class ConfigService extends TypertRemoteService {
+    private readonly repo;
+    constructor(ctx: Context, repo: WorkerConfigRepo);
+    get(): Promise<WorkerConfig>;
+    set(config: WorkerConfig): Promise<WorkerConfig>;
+    /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
+    providers(): Promise<LlmProviderInfo[]>;
 }
 export type { RecordView as CmFlowRecordView };

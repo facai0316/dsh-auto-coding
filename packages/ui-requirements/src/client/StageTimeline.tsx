@@ -19,6 +19,8 @@ const STAGE_STATUS_LABEL: Record<string, string> = {
   success: '完成',
   failed: '失败',
   waiting_reply: '待决策',
+  waiting_review: '待审核',
+  retrying: '重试中',
 }
 
 /**

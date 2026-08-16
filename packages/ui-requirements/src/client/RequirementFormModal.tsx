@@ -12,27 +12,31 @@ interface Props {
   projects: readonly Project[]
   busy: boolean
   onClose: () => void
-  onSubmit: (title: string, description: string | undefined, projectId: string) => void
+  /** 需求创建提交：描述必填。 */
+  onSubmit: (title: string, description: string, projectId: string) => void
 }
 
-/** 登记需求：标题（必填）+ 描述（可选）+ 项目（必选，draft 挂项目）。 */
+/**
+ * 需求新增表单（需求创建后不允许更改）：项目 + 标题 + 描述（必填）。
+ * 弹层 80% 宽、高度不限（内容区纵向滚动）。
+ */
 export function RequirementFormModal({ visible, projects, busy, onClose, onSubmit }: Props): ReactElement {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState<string | undefined>()
 
   useEffect(() => {
-    if (visible) {
-      setTitle('')
-      setDescription('')
-      setProjectId(projects[0]?.id)
-    }
+    if (!visible) return
+    setTitle('')
+    setDescription('')
+    setProjectId(projects[0]?.id)
   }, [visible, projects])
 
   return (
     <Modal
       title="添加需求"
       visible={visible}
+      width="80%"
       onCancel={onClose}
       maskClosable={false}
       footer={(
@@ -40,9 +44,9 @@ export function RequirementFormModal({ visible, projects, busy, onClose, onSubmi
           <Button theme="borderless" disabled={busy} onClick={onClose}>取消</Button>
           <Button
             theme="solid"
-            disabled={title.trim() === '' || projectId === undefined || busy}
+            disabled={title.trim() === '' || description.trim() === '' || projectId === undefined || busy}
             onClick={() => {
-              onSubmit(title.trim(), description.trim() === '' ? undefined : description.trim(), projectId!)
+              onSubmit(title.trim(), description.trim(), projectId!)
             }}
           >
             添加
@@ -50,7 +54,7 @@ export function RequirementFormModal({ visible, projects, busy, onClose, onSubmi
         </>
       )}
     >
-      <div className={classes.form}>
+      <div className={classes.form} style={{ maxHeight: '75vh', overflowY: 'auto' }}>
         <div className={classes.formField}>
           <label>项目</label>
           <Select
@@ -66,8 +70,13 @@ export function RequirementFormModal({ visible, projects, busy, onClose, onSubmi
           <Input value={title} onChange={(value) => { setTitle(value) }} placeholder="需求标题，如：实现 XX 功能" autoFocus />
         </div>
         <div className={classes.formField}>
-          <label>描述（可选）</label>
-          <TextArea value={description} onChange={(value) => { setDescription(value) }} placeholder="补充背景、验收标准等…" rows={3} />
+          <label>描述（必填）</label>
+          <TextArea
+            value={description}
+            onChange={(value) => { setDescription(value) }}
+            placeholder="补充背景、目标、验收标准等…"
+            rows={4}
+          />
         </div>
       </div>
     </Modal>

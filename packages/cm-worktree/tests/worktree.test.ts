@@ -30,6 +30,7 @@ async function makeFixture(): Promise<Fixture> {
   // 空仓库 clone 后分支名可能非 main；强制命名避免 push 时 refspec 不匹配
   await git(repo, ['branch', '-M', 'main'])
   writeFileSync(join(repo, 'main.txt'), 'base\n')
+  writeFileSync(join(repo, '.gitignore'), '/target\n')
   await git(repo, ['add', '.'])
   await git(repo, ['commit', '-q', '-m', 'base'])
   await git(repo, ['push', '-q', '-u', 'origin', 'main'])
@@ -88,6 +89,20 @@ describe('WorktreeManager against a real throwaway repository', () => {
     expect(remoteBranches).toContain('refs/heads/req-bbb')
   })
 
+  it('commitAll commits every uncommitted change and no-ops when clean', async () => {
+    const aPath = fixture.manager.pathFor('req-aaa')
+    // 干净 → no-op（不产生空提交）
+    expect(await fixture.manager.commitAll(aPath, 'chore: noop')).toBe(false)
+    // 有改动（含新增 + 修改）→ 一次 commit 全量落盘到任务分支
+    writeFileSync(join(aPath, 'new.txt'), 'n\n')
+    writeFileSync(join(aPath, 'main.txt'), 'base\n+change\n')
+    expect(await fixture.manager.commitAll(aPath, 'chore: pipeline stage artifacts')).toBe(true)
+    expect((await git(aPath, ['log', '--oneline', '-1'])).trim()).toContain('chore: pipeline stage artifacts')
+    expect(await git(aPath, ['status', '--porcelain'])).toBe('')
+    // 提交后再跑 → no-op
+    expect(await fixture.manager.commitAll(aPath, 'chore: again')).toBe(false)
+  })
+
   it('reports merged state and removes the worktree + branch after merge', async () => {
     const b = { path: fixture.manager.pathFor('req-bbb'), branch: 'req-bbb', base: 'origin/main' }
     expect(await fixture.manager.isMerged(b)).toBe(false)
@@ -99,5 +114,32 @@ describe('WorktreeManager against a real throwaway repository', () => {
     await fixture.manager.remove(b)
     expect(existsSync(b.path)).toBe(false)
     expect((await git(fixture.repo, ['branch', '--list', 'req-bbb'])).trim()).toBe('')
+  })
+
+  it('pullMain fast-forwards the primary checkout main after a remote merge', async () => {
+    // Simulate a PR merge landing on the remote from a second clone: the primary
+    // checkout's local main is now behind origin/main.
+    const second = join(fixture.root, 'second')
+    await exec('git', ['clone', '-q', join(fixture.root, 'remote.git'), second])
+    await git(second, ['config', 'user.email', 'test@local'])
+    await git(second, ['config', 'user.name', 'test'])
+    // bare 仓库 HEAD 未指向 main → clone 落在 detached HEAD；显式建 main 分支
+    await git(second, ['checkout', '-b', 'main', 'origin/main'])
+    writeFileSync(join(second, 'from-remote.txt'), 'r\n')
+    await git(second, ['add', '.'])
+    await git(second, ['commit', '-q', '-m', 'remote merge commit'])
+    await git(second, ['push', '-q', 'origin', 'main'])
+
+    const before = await git(fixture.repo, ['rev-parse', 'HEAD'])
+    // 刷新主 checkout 的 origin/main tracking ref，才能与真实远端比较
+    await git(fixture.repo, ['fetch', '-q', 'origin', 'main'])
+    const remoteHead = await git(fixture.repo, ['rev-parse', 'origin/main'])
+    expect(before).not.toBe(remoteHead)
+
+    await fixture.manager.pullMain()
+    expect(await git(fixture.repo, ['rev-parse', 'HEAD'])).toBe(remoteHead)
+    expect(await git(fixture.repo, ['status', '--porcelain'])).toBe('')
+    // worktree 不受影响（仍独立检出）
+    expect(existsSync(fixture.manager.pathFor('req-aaa'))).toBe(true)
   })
 })

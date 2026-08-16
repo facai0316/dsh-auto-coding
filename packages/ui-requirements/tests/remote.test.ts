@@ -9,7 +9,7 @@ import {
 } from '../src/client/remote.ts'
 
 describe('ui-requirements requirements remote contract', () => {
-  it('declares requirements/projects/questions namespaces with the expected methods', () => {
+  it('declares requirements/projects/questions/records namespaces with the expected methods', () => {
     expect(CONTRIBUTION.package).toBe('@auto-coding/cm-flow')
     const methods = CONTRIBUTION.descriptors.map(d => `${d.namespace}/${d.method}`)
     expect(methods).toEqual([
@@ -17,10 +17,25 @@ describe('ui-requirements requirements remote contract', () => {
       'requirements/create',
       'requirements/transition',
       'requirements/confirmMerged',
+      'requirements/update',
+      'requirements/delete',
       'projects/list',
       'projects/create',
+      'projects/update',
+      'projects/delete',
+      'records/list',
+      'records/create',
+      'records/update',
+      'records/delete',
       'questions/list',
       'questions/answer',
+      'reviews/list',
+      'reviews/approve',
+      'reviews/reject',
+      'config/get',
+      'config/set',
+      'config/providers',
+      'merge/resolveConflicts',
     ])
   })
 
@@ -37,8 +52,8 @@ describe('ui-requirements requirements remote contract', () => {
     expect(list?.parameters[0]?.codec.schema.parse(undefined)).toBeUndefined()
   })
 
-  it('status codec accepts exactly the six states', () => {
-    for (const status of ['draft', 'open', 'in_progress', 'merging', 'done', 'cancelled']) {
+  it('status codec accepts exactly the seven states', () => {
+    for (const status of ['draft', 'open', 'in_progress', 'merging', 'done', 'cancelled', 'terminated']) {
       expect(statusSchema.parse(status)).toBe(status)
     }
     expect(() => statusSchema.parse('archived')).toThrow()

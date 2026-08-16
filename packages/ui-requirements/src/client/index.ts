@@ -18,11 +18,18 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { RequirementsPanel } from './RequirementsPanel.tsx'
 import {
   CONTRIBUTION,
+  SETTINGS_CONTRIBUTION,
   attach,
+  attachSettings,
   detach,
+  type ConfigRemote,
+  type MergeRemote,
   type ProjectsRemote,
   type QuestionsRemote,
+  type RecordsRemote,
   type RequirementsRemote,
+  type ReviewsRemote,
+  type SettingsNamespaces,
 } from './remote.ts'
 
 /** Required services: slots registry + the client `remote` bridge. */
@@ -75,10 +82,14 @@ export function apply(ctx: Context): void {
         const requirements = ctx.get('remote.requirements') as RequirementsRemote | undefined
         const projects = ctx.get('remote.projects') as ProjectsRemote | undefined
         const questions = ctx.get('remote.questions') as QuestionsRemote | undefined
-        if (requirements === undefined || projects === undefined || questions === undefined) {
-          throw new Error('需求面板: cm-flow remote 命名空间未完全挂载')
+        const reviews = ctx.get('remote.reviews') as ReviewsRemote | undefined
+        const records = ctx.get('remote.records') as RecordsRemote | undefined
+        const config = ctx.get('remote.config') as ConfigRemote | undefined
+        const merge = ctx.get('remote.merge') as MergeRemote | undefined
+        if (requirements === undefined || projects === undefined || questions === undefined || reviews === undefined || records === undefined || config === undefined || merge === undefined) {
+          throw new Error('自动化看板: cm-flow / cm-worker remote 命名空间未完全挂载')
         }
-        attach({ requirements, projects, questions })
+        attach({ requirements, projects, questions, reviews, records, config, merge })
       })
       .catch(error => { detach(error) })
     ctx.effect(() => () => {
@@ -87,8 +98,36 @@ export function apply(ctx: Context): void {
     }, 'ui-requirements: unmount requirements remote')
   }
 
+  // Settings namespaces (pgconfig / usage) are served by THIS package's host
+  // half, so their contribution mounts independently of cm-flow. A failure
+  // here degrades only the settings pages (they surface their own error) and
+  // must not tear down the requirements remote.
+  if (remote !== undefined) {
+    let settingsDisposed = false
+    let disposeSettings: (() => Promise<void>) | undefined
+    void remote.$mount(SETTINGS_CONTRIBUTION)
+      .then(async dispose => {
+        if (settingsDisposed) { await dispose(); return }
+        disposeSettings = dispose
+        const pgconfig = ctx.get('remote.pgconfig') as SettingsNamespaces['pgconfig'] | undefined
+        const usage = ctx.get('remote.usage') as SettingsNamespaces['usage'] | undefined
+        if (pgconfig === undefined || usage === undefined) {
+          console.error('设置页: pgconfig / usage remote 命名空间未挂载(host 半需重启生效)')
+          return
+        }
+        attachSettings({ pgconfig, usage })
+      })
+      .catch(error => {
+        console.error('设置页 remote 挂载失败:', error)
+      })
+    ctx.effect(() => () => {
+      settingsDisposed = true
+      void disposeSettings?.()
+    }, 'ui-requirements: unmount settings remote')
+  }
+
   ctx.slots.inject('conversation.view', () => ctx.slots.register(
-    { name: 'conversation.view', id: 'requirements', order: 15, label: '需求面板' },
+    { name: 'conversation.view', id: 'requirements', order: 15, label: '自动化看板' },
     RequirementsPanel,
   ))
 }
