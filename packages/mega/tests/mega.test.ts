@@ -75,6 +75,14 @@ describe('@auto-coding/mega usage documentation', () => {
     expect(usage).toContain('# 使用说明')
   })
 
+  it('stays byte-identical to the ui-requirements copy (the panel reads that one)', () => {
+    // The live 使用说明 page is served by the ui-requirements package's
+    // assets/USAGE.md; a stale copy there is what showed the removed
+    // builtin-skills step after v0.3.1. Keep the two copies in lockstep.
+    const uiCopy = readFileSync(join(here, '..', '..', 'ui-requirements', 'assets', 'USAGE.md'), 'utf8')
+    expect(usage).toBe(uiCopy)
+  })
+
   it('walks the user through the four setup steps', () => {
     expect(usage).toContain('配置数据库')
     expect(usage).toContain('迁移')
