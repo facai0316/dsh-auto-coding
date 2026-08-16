@@ -55,8 +55,8 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import { PG_DEFAULTS, findRowConfig, mergedConfig, parsePatchFile, resolvePatchPath, serializePatch, validatePgConfig, } from "./patch-utils.js";
-export { findRowConfig, validatePgConfig, PG_DEFAULTS } from "./patch-utils.js";
+import { PG_DEFAULTS, findRowConfig, mergedConfig, parsePatchFile, resolvePatchPath, upsertRowConfigInText, validatePgConfig, } from "./patch-utils.js";
+export { findRowConfig, upsertRowConfigInText, validatePgConfig, PG_DEFAULTS } from "./patch-utils.js";
 export const name = 'ui-requirements';
 /** pgconfig remote: read / save / test the db-pgmas row config. */
 let PgConfigRemote = (() => {
@@ -109,23 +109,19 @@ let PgConfigRemote = (() => {
             const config = value;
             const file = this.patchPath();
             try {
-                let items;
+                let text = '';
                 try {
-                    items = parsePatchFile(file);
+                    text = readFileSync(file, 'utf8');
                 }
                 catch {
-                    items = [];
+                    // Missing patch file: start from an empty list (upsert appends the row).
                 }
-                // Replace an existing top-level override for this row id, else append.
-                const rowId = this.config.dbRowId ?? 'db-pgmas';
-                const overrideIndex = items.findIndex(item => item?.id === rowId
-                    && !Array.isArray(item.insert));
-                const override = { id: rowId, config };
-                if (overrideIndex >= 0)
-                    items[overrideIndex] = override;
-                else
-                    items.push(override);
-                writeFileSync(file, serializePatch(items), 'utf8');
+                // Surgical AST edit, never a parse→JS→stringify round-trip: the latter
+                // silently strips `!!js` from every other row in the file (e.g. the
+                // webserver port line), breaking the next restart. An unparseable file is
+                // reported instead of being clobbered.
+                const next = upsertRowConfigInText(text, this.config.dbRowId ?? 'db-pgmas', config);
+                writeFileSync(file, next, 'utf8');
             }
             catch (cause) {
                 const message = cause instanceof Error ? cause.message : String(cause);

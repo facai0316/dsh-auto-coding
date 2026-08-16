@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { parseDocument, stringify } from "yaml";
+import { isMap, isPair, isScalar, isSeq, parseDocument } from "yaml";
 //#region build/patch-utils.js
 /**
 * Decorator-free helpers for the ui-requirements host half: reading and
@@ -59,8 +59,42 @@ function parsePatchFile(file) {
 	const items = doc.toJS();
 	return Array.isArray(items) ? items : [];
 }
-function serializePatch(items) {
-	return stringify(items);
+/**
+* Surgically rewrite a user-layer patch file's text so the row `rowId` carries
+* `config`, preserving every OTHER node verbatim — `!!js` tagged expressions,
+* comments, and key order. Editing the parsed Document AST instead of
+* round-tripping through plain JS objects is what keeps `!!js` alive: yaml's
+* `toJS()` resolves a tagged scalar to its plain string, so a parse→JS→stringify
+* cycle would silently strip the tag and turn
+* `port: !!js ctx.webStartup.port ?? 3080` into a literal string the Loader can
+* no longer evaluate (the webserver then fails to bind → boot failure).
+*
+* Mirrors the previous `{ id, config }` replace-or-append semantics: a top-level
+* row (a map whose `id` matches, excluding `insert` rows) gets its `config`
+* value replaced or added; otherwise a new `{ id, config }` row is appended.
+*
+* @throws if the text is not parseable as a YAML sequence.
+*/
+function upsertRowConfigInText(text, rowId, config) {
+	const doc = parseDocument(text.length > 0 ? text : "[]");
+	if (doc.errors.length > 0) throw new Error(`patch parse error: ${doc.errors[0].message}`);
+	if (doc.contents === null) doc.contents = doc.createNode([]);
+	if (!isSeq(doc.contents)) throw new Error("patch root must be a YAML list");
+	const items = doc.contents.items;
+	const keyIs = (pair, key) => isPair(pair) && isScalar(pair.key) && pair.key.value === key;
+	for (let index = 0; index < items.length; index++) {
+		const item = items[index];
+		if (!isMap(item) || item.items.some((pair) => keyIs(pair, "insert"))) continue;
+		const idPair = item.items.find((pair) => keyIs(pair, "id"));
+		if (!idPair || !isScalar(idPair.value) || idPair.value.value !== rowId) continue;
+		doc.setIn([index, "config"], config);
+		return doc.toString();
+	}
+	doc.addIn([], {
+		id: rowId,
+		config
+	});
+	return doc.toString();
 }
 function isRecord(value) {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -232,21 +266,12 @@ let PgConfigRemote = (() => {
 			const config = value;
 			const file = this.patchPath();
 			try {
-				let items;
+				let text = "";
 				try {
-					items = parsePatchFile(file);
-				} catch {
-					items = [];
-				}
-				const rowId = this.config.dbRowId ?? "db-pgmas";
-				const overrideIndex = items.findIndex((item) => item?.id === rowId && !Array.isArray(item.insert));
-				const override = {
-					id: rowId,
-					config
-				};
-				if (overrideIndex >= 0) items[overrideIndex] = override;
-				else items.push(override);
-				writeFileSync(file, serializePatch(items), "utf8");
+					text = readFileSync(file, "utf8");
+				} catch {}
+				const next = upsertRowConfigInText(text, this.config.dbRowId ?? "db-pgmas", config);
+				writeFileSync(file, next, "utf8");
 			} catch (cause) {
 				return {
 					ok: false,
@@ -372,4 +397,4 @@ function apply(ctx, config = {}) {
 	new UsageRemote(ctx, resolved.usagePath);
 }
 //#endregion
-export { PG_DEFAULTS, PgConfigRemote, UsageRemote, apply, findRowConfig, name, validatePgConfig };
+export { PG_DEFAULTS, PgConfigRemote, UsageRemote, apply, findRowConfig, name, upsertRowConfigInText, validatePgConfig };

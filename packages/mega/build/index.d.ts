@@ -22,7 +22,7 @@ import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { type Config } from './patch-utils.ts';
 export type { Config } from './patch-utils.ts';
-export { findRowConfig, validatePgConfig, PG_DEFAULTS } from './patch-utils.ts';
+export { findRowConfig, upsertRowConfigInText, validatePgConfig, PG_DEFAULTS } from './patch-utils.ts';
 export declare const name = "ui-requirements";
 /** pgconfig remote: read / save / test the db-pgmas row config. */
 export declare class PgConfigRemote extends TypertRemoteService {
