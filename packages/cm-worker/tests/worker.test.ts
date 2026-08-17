@@ -20,6 +20,7 @@ import {
   parsePrResult,
   parseStageResult,
   runLanes,
+  stageWindowAllowed,
   withinWindow,
   type PipelineWorktree,
   type PrExecution,
@@ -167,6 +168,7 @@ function makeDeps(
   configFor: (category: string) => StageAgentOptions | undefined = category =>
     category === 'decision' ? { model: 'deepseek-v4-pro' } : undefined,
   artifactExists: (wtPath: string, relPath: string) => Promise<boolean> = async () => true,
+  windowFor: ((category: string) => boolean) | undefined = undefined,
 ): MakeDepsResult {
   return {
     deps: {
@@ -182,6 +184,7 @@ function makeDeps(
       worktreeFor: () => worktree,
       maxRetries,
       configFor,
+      ...(windowFor !== undefined ? { windowFor } : {}),
     },
     worktree,
   }
@@ -285,6 +288,109 @@ describe.skipIf(!(await reachable()))('WorkerPipeline against the live cm databa
     // merge record 带 prUrl
     const artifacts = (await pool.query('select artifacts from records where requirement_id = $1 and category = $2', [id, 'merge'])).rows[0] as { artifacts: string[] }
     expect(artifacts.artifacts[0]).toBe('https://gitee.com/o/r/pulls/1')
+  })
+
+  it('defers per-stage time-window-limited stages and resumes them via the stuck-gap scan when the window opens', async () => {
+    const requirements = new RequirementsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const projects = new ProjectsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE })
+    const questions = new QuestionsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const reviews = new ReviewsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const tokenProjectId = await createTokenProject()
+    const id = await openRequirement(requirements, tokenProjectId)
+
+    const executor = new FakeExecutor(() => ({
+      stopReason: 'completed',
+      structured: { isError: false, message: 'ok', artifacts: [], questions: [] },
+    }))
+    // 可变「窗口外受限阶段」集合：模拟时段配置随 tick 热切换。
+    let blocked = new Set<string>(['plan'])
+    const windowFor = (category: string): boolean => !blocked.has(category)
+    const { deps, worktree } = makeDeps(executor, requirements, projects, questions, reviews, new FakeWorktree(), 1, () => undefined, async () => true, windowFor)
+    const pipeline = new WorkerPipeline(deps)
+    const rowsOf = () => pool.query('select category, status from records where requirement_id = $1 order by created_at asc', [id])
+    const gapOf = async () => (await pipeline.listStuckGaps(20)).find(g => g.requirement_id === id)
+
+    // ① plan 受限（窗口外）：decision 正常跑完过审后，链在 plan 前延后——
+    //    不落 plan record、不起 plan 会话，需求停在 decision success 的缺口。
+    expect(await pipeline.claimAndRun()).toBe(true)
+    await approveGate(reviews, await recordIdOf(id, 'decision'))
+    await pipeline.processReviews()
+    let rows = (await rowsOf()).rows as { category: string; status: string }[]
+    expect(rows).toEqual([{ category: 'decision', status: 'success' }])
+    expect(executor.calls.some(call => call.category === 'plan')).toBe(false)
+    expect(await gapOf()).toMatchObject({ requirement_id: id, last_category: 'decision' })
+
+    // ② plan 进入窗口、merge 仍在窗外：缺口续跑从 plan 接上（plan → review-plan
+    //    → plan 停在延后人审门）；merge 未到，尚无 push/PR。
+    blocked = new Set(['merge'])
+    await pipeline.resumeGap((await gapOf())!)
+    rows = (await rowsOf()).rows as { category: string; status: string }[]
+    expect(rows.map(r => r.category)).toEqual(['decision', 'plan', 'review-plan'])
+    expect(rows.find(r => r.category === 'plan')?.status).toBe('waiting_review')
+    expect(worktree.pushes).toEqual([])
+    expect(executor.prCalls).toHaveLength(0)
+
+    // 放行 plan 人审 → coding/contract/review-code 跑完 → merge 受限延后：
+    // 全部阶段 success、无 merge record、需求仍 in_progress（缺口 = review-code）。
+    await approveGate(reviews, await recordIdOf(id, 'plan'))
+    await pipeline.processReviews()
+    rows = (await rowsOf()).rows as { category: string; status: string }[]
+    expect(rows.map(r => r.category)).toEqual([...STAGES.map(s => s.category)])
+    expect(rows.every(r => r.status === 'success')).toBe(true)
+    expect(executor.prCalls).toHaveLength(0)
+    expect(worktree.pushes).toEqual([])
+    let req = (await pool.query('select status from requirements where id = $1', [id])).rows[0] as { status: string }
+    expect(req.status).toBe('in_progress')
+    expect(await gapOf()).toMatchObject({ requirement_id: id, last_category: 'review-code' })
+
+    // ③ 窗口全开：缺口续跑补 merge（push + PR）→ 需求 merging。
+    blocked = new Set()
+    await pipeline.resumeGap((await gapOf())!)
+    rows = (await rowsOf()).rows as { category: string; status: string }[]
+    expect(rows.map(r => r.category)).toEqual([...STAGES.map(s => s.category), 'merge'])
+    expect(rows.find(r => r.category === 'merge')?.status).toBe('success')
+    expect(executor.prCalls).toHaveLength(1)
+    expect(worktree.pushes).toEqual([`req-${id.slice(0, 8)}`])
+    req = (await pool.query('select status from requirements where id = $1', [id])).rows[0] as { status: string }
+    expect(req.status).toBe('merging')
+  })
+
+  it('recovers a claim deferred before its first record (time-window race) via the gap scan, restarting from the first stage', async () => {
+    const requirements = new RequirementsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const projects = new ProjectsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE })
+    const questions = new QuestionsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const reviews = new ReviewsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const tokenProjectId = await createTokenProject()
+    const id = await openRequirement(requirements, tokenProjectId)
+
+    const executor = new FakeExecutor(() => ({
+      stopReason: 'completed',
+      structured: { isError: false, message: 'ok', artifacts: [], questions: [] },
+    }))
+    let blocked = new Set<string>(['decision'])
+    const windowFor = (category: string): boolean => !blocked.has(category)
+    const { deps } = makeDeps(executor, requirements, projects, questions, reviews, new FakeWorktree(), 1, () => undefined, async () => true, windowFor)
+    const pipeline = new WorkerPipeline(deps)
+
+    // 竞态：领取时窗口还开着，起跑 decision 时已关（decision 受限）——
+    // runClaimed 在首阶段前延后，需求 in_progress 且零 record。
+    const claim = await pipeline.claim()
+    expect(claim?.id).toBe(id)
+    await pipeline.runClaimed(claim!)
+    let rows = (await pool.query('select category from records where requirement_id = $1', [id])).rows as { category: string }[]
+    expect(rows).toEqual([])
+    expect(executor.calls).toHaveLength(0)
+    // 零 record 的领取竞态也在缺口扫描视野内（last_category = null）
+    const gap = (await pipeline.listStuckGaps(20)).find(g => g.requirement_id === id)
+    expect(gap).toMatchObject({ requirement_id: id, last_category: null })
+
+    // 窗口开启 → 缺口续跑从首阶段（decision）整链跑起 → 停在 decision 人审门
+    blocked = new Set()
+    await pipeline.resumeGap(gap!)
+    rows = (await pool.query('select category from records where requirement_id = $1 order by created_at asc', [id])).rows as { category: string }[]
+    expect(rows.map(r => r.category)).toEqual(['decision'])
+    expect((await pool.query('select status from records where requirement_id = $1', [id])).rows[0]).toMatchObject({ status: 'waiting_review' })
+    expect(executor.calls.filter(call => call.category === 'decision')).toHaveLength(1)
   })
 
   it('pauses to waiting_reply with questions when a stage asks the user, and requires answering + approve to continue', async () => {
@@ -705,6 +811,52 @@ describe.skipIf(!(await reachable()))('WorkerPipeline against the live cm databa
     await pipeline.processReviews()
     await approveGate(reviews, await recordIdOf(id, 'plan'))
     await pipeline.processReviews()
+    const req = (await pool.query('select status from requirements where id = $1', [id])).rows[0] as { status: string }
+    expect(req.status).toBe('merging')
+  })
+
+  it('continues into merge after the last stage succeeds via retry (no success-gap zombie)', async () => {
+    // ADR-030 事故回归：review-code 失败 1 次后经重试路径成功，旧代码重试成功
+    // 即返回、无人再调 runMerge → 需求停在「6 阶段全 success、无 merge record」
+    // 的缺口僵尸态（表面执行中，无运行无审核）。重试成功必须接续链条。
+    const requirements = new RequirementsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE, userId: TEST_USER_ID })
+    const projects = new ProjectsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE })
+    const questions = new QuestionsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE })
+    const reviews = new ReviewsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE })
+    const tokenProjectId = await createTokenProject()
+    const id = await openRequirement(requirements, tokenProjectId)
+    const worktree = new FakeWorktree()
+
+    let reviewCodeCalls = 0
+    const executor = new FakeExecutor((input: StageInput) => {
+      if (input.category === 'review-code') {
+        reviewCodeCalls += 1
+        if (reviewCodeCalls === 1) {
+          return { stopReason: 'completed', structured: { isError: true, message: '审读失败一次', artifacts: [], questions: [] } }
+        }
+      }
+      return { stopReason: 'completed', structured: { isError: false, message: 'ok', artifacts: [], questions: [] } }
+    })
+    const { deps } = makeDeps(executor, requirements, projects, questions, reviews, worktree)
+    const pipeline = new WorkerPipeline(deps)
+
+    await pipeline.claimAndRun()
+    // 放行两道人审门（decision 立即门 + plan 延后门）→ 链条推进到 review-code 失败
+    await approveGate(reviews, await recordIdOf(id, 'decision'))
+    await pipeline.processReviews()
+    await approveGate(reviews, await recordIdOf(id, 'plan'))
+    await pipeline.processReviews()
+    let reviewCode = (await pool.query('select status, retry_count from records where requirement_id = $1 and category = $2', [id, 'review-code'])).rows[0] as { status: string; retry_count: number }
+    expect(reviewCode).toMatchObject({ status: 'failed', retry_count: 0 })
+
+    // 重试 → review-code 复用同一 record 成功 → 必须接续 merge（push + PR + merging）
+    await pipeline.retryFailed()
+    reviewCode = (await pool.query('select status, retry_count from records where requirement_id = $1 and category = $2', [id, 'review-code'])).rows[0] as { status: string; retry_count: number }
+    expect(reviewCode).toMatchObject({ status: 'success', retry_count: 1 })
+    const mergeRow = (await pool.query("select status, artifacts from records where requirement_id = $1 and category = 'merge'", [id])).rows[0] as { status: string; artifacts: string[] }
+    expect(mergeRow).toBeDefined()
+    expect(mergeRow.status).toBe('success')
+    expect(mergeRow.artifacts[0]).toContain('https://gitee.com/')
     const req = (await pool.query('select status from requirements where id = $1', [id])).rows[0] as { status: string }
     expect(req.status).toBe('merging')
   })
@@ -1150,6 +1302,39 @@ describe('withinWindow 时段门控', () => {
   it('起=止视为不限制', () => {
     expect(withinWindow(cfg(9, 9), at(3))).toBe(true)
     expect(withinWindow(cfg(0, 0), at(12))).toBe(true)
+  })
+})
+
+describe('stageWindowAllowed 每阶段时段门控', () => {
+  const at = (hour: number): Date => { const d = new Date(); d.setHours(hour, 0, 0, 0); return d }
+  const base = { timeWindowEnabled: true, startHour: 22, endHour: 6 }
+
+  it('未启用时段 → 任意阶段恒 true', () => {
+    expect(stageWindowAllowed({ ...base, timeWindowEnabled: false, timeWindowStages: null }, 'coding', at(12))).toBe(true)
+    expect(stageWindowAllowed({ ...base, timeWindowEnabled: false, timeWindowStages: ['coding'] }, 'coding', at(12))).toBe(true)
+  })
+
+  it('清单缺省（null/undefined，旧配置）= 全部阶段受限（等价 withinWindow）', () => {
+    expect(stageWindowAllowed({ ...base, timeWindowStages: null }, 'coding', at(23))).toBe(true)
+    expect(stageWindowAllowed({ ...base, timeWindowStages: null }, 'plan', at(12))).toBe(false)
+    expect(stageWindowAllowed({ ...base }, 'merge', at(12))).toBe(false)
+  })
+
+  it('空清单 = 无阶段受限（窗口外也 24h 可跑）', () => {
+    expect(stageWindowAllowed({ ...base, timeWindowStages: [] }, 'coding', at(12))).toBe(true)
+    expect(stageWindowAllowed({ ...base, timeWindowStages: [] }, 'merge', at(12))).toBe(true)
+  })
+
+  it('清单内阶段按窗口判定，清单外阶段恒 true（含跨天窗口）', () => {
+    const cfg = { ...base, timeWindowStages: ['coding', 'merge'] }
+    // 跨天夜间窗口 22:00→06:00
+    expect(stageWindowAllowed(cfg, 'coding', at(23))).toBe(true)
+    expect(stageWindowAllowed(cfg, 'coding', at(3))).toBe(true)
+    expect(stageWindowAllowed(cfg, 'coding', at(12))).toBe(false)
+    expect(stageWindowAllowed(cfg, 'merge', at(12))).toBe(false)
+    // 未勾选阶段不限时段
+    expect(stageWindowAllowed(cfg, 'plan', at(12))).toBe(true)
+    expect(stageWindowAllowed(cfg, 'review-code', at(12))).toBe(true)
   })
 })
 

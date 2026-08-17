@@ -121,6 +121,12 @@ export interface StageModelConfig {
 export interface WorkerConfig {
     /** 是否启用「仅指定时段运行」。false = 24h 全时段。 */
     timeWindowEnabled: boolean;
+    /**
+     * 时段限制作用的阶段清单（records.category；merge/resolve 亦属阶段）。
+     * null/缺省 = 全部阶段受限（旧语义，窗口外 worker 整轮不派发）；
+     * 数组（可为空）= 仅勾选阶段受限时段，未勾选阶段 24h 可跑。
+     */
+    timeWindowStages?: string[] | null;
     /** 起始小时（0-23，含）。 */
     startHour: number;
     /** 结束小时（0-23，不含；start>end 视为跨天窗口）。 */

@@ -39,6 +39,22 @@ export function withinWindow(config, now = new Date()) {
     return hour >= start || hour < end;
 }
 /**
+ * 每阶段时段门控：某阶段此刻是否允许起跑。
+ * - 未启用时段 → 恒 true；
+ * - 阶段清单缺省（null/undefined，旧配置）→ 全部阶段受限（等价 withinWindow）；
+ * - 清单内阶段按 withinWindow 判定，清单外阶段（未勾选）恒 true（24h 可跑）。
+ */
+export function stageWindowAllowed(config, category, now = new Date()) {
+    if (config.timeWindowEnabled !== true)
+        return true;
+    const limited = config.timeWindowStages;
+    if (limited === null || limited === undefined)
+        return withinWindow(config, now);
+    if (!limited.includes(category))
+        return true;
+    return withinWindow(config, now);
+}
+/**
  * 并发 lanes：同时启动 `count` 个流水线（每个领取并跑一条需求）。
  * 领取用 `for update skip locked`，并发安全；返回实际跑起来的条数。
  * count 已由调用方钳制（1..MAX_CONCURRENCY）。
@@ -315,7 +331,7 @@ export class WorkerPipeline {
                 ? { recordId: resume.recordId, userAnswers: resume.userAnswers }
                 : undefined;
             const outcome = await this.runStage(input, stage, stageOpts);
-            if (outcome === 'waiting' || outcome === 'failed' || outcome === 'terminated')
+            if (outcome === 'waiting' || outcome === 'failed' || outcome === 'terminated' || outcome === 'deferred')
                 return outcome;
         }
         // 全部阶段成功 → merge 阶段（push + PR agent 任务）
@@ -323,6 +339,12 @@ export class WorkerPipeline {
     }
     /** 单阶段：prompt → 会话 → 结构化结果 → 记账。带 recordId 时为续跑（复用该 record）。 */
     async runStage(requirement, stage, opts) {
+        // 时段门控（每阶段）：窗口外的受限阶段本轮不起跑——不落任何 record、
+        // 不动现有状态，需求停在「上一阶段 success」的可续跑缺口（gap），窗口
+        // 开启后由每轮 tick 的缺口续跑（resumeGap）从本阶段接着跑。
+        if (this.deps.windowFor !== undefined && !this.deps.windowFor(stage.category)) {
+            return 'deferred';
+        }
         const recordId = opts?.recordId;
         const userAnswers = opts?.userAnswers ?? [];
         const feedback = opts?.feedback;
@@ -488,6 +510,10 @@ export class WorkerPipeline {
      * waiting_reply（用户补 token 或手动建 PR 后点「已合并」）。
      */
     async runMerge(requirement, opts) {
+        // 时段门控：merge 受限且窗口外 → 延后（不落 merge record，保持缺口态可续跑）。
+        if (this.deps.windowFor !== undefined && !this.deps.windowFor('merge')) {
+            return 'deferred';
+        }
         const recordId = opts?.recordId;
         // 终止检查：需求已终止（不可逆）→ merge record 也标记终止并停止。
         const current = await this.deps.requirements.getById(requirement.id);
@@ -1077,7 +1103,11 @@ export class WorkerPipeline {
       `));
         return res.rowCount ?? 0;
     }
-    /** ⑤b 缺口僵尸行：in_progress 需求 + 最新 record = 阶段 success + 无挂起/失败 + 无 merge。 */
+    /**
+     * ⑤b 缺口僵尸行：in_progress 需求 + 最新 record = 阶段 success（或领取后
+     * 尚未落任何 record——领取与首阶段记账之间崩溃/被时段延后的竞态）+
+     * 无挂起/失败 + 无 merge。
+     */
     async listStuckGaps(limit = 5) {
         const rows = await this.deps.pgmas.withClient(this.deps.database, client => client.query(`
         select r.id as requirement_id,
@@ -1094,23 +1124,24 @@ export class WorkerPipeline {
             select 1 from records rc3
             where rc3.requirement_id = r.id::text and rc3.category = 'merge'
           )
-          -- 最新 record 必须是阶段 success（running/waiting/failed 由正常派发路径接管；
-          -- 更早的 failed（重试后成功）不影响缺口判定）
-          and (
+          -- 最新 record 必须是阶段 success，或根本没有 record（领取后竞态残留；
+          -- running/waiting/failed 由正常派发路径接管，更早的 failed（重试后
+          -- 成功）不影响缺口判定）
+          and coalesce((
             select rc4.status from records rc4
             where rc4.requirement_id = r.id::text
             order by rc4.created_at desc, rc4.id desc limit 1
-          ) = 'success'
+          ), 'none') in ('success', 'none')
         order by r.updated_at asc
         limit $1
       `, [limit]));
         return rows.rows;
     }
-    /** ⑤c 续跑一条缺口僵尸：最后阶段 success → 补 merge；中途缺口 → 从下一阶段继续。 */
+    /**
+     * ⑤c 续跑一条缺口僵尸：无 record（领取竞态）→ 从首阶段跑起；最后阶段
+     * success → 补 merge；中途缺口 → 从下一阶段继续。
+     */
     async resumeGap(row) {
-        const stageIndex = STAGES.findIndex(s => s.category === row.last_category);
-        if (stageIndex < 0)
-            return;
         const requirement = await this.deps.requirements.getById(row.requirement_id);
         if (requirement === undefined || requirement.status !== 'in_progress')
             return;
@@ -1128,6 +1159,15 @@ export class WorkerPipeline {
             project,
             wt: { path: wt.pathFor(branch), branch },
         };
+        // 起跑阶段：零 record（领取竞态）→ 首阶段；否则「最后 success 阶段」的
+        // 下一阶段（未知阶段安全返回）。
+        if (row.last_category === null || row.last_category === '') {
+            await this.runPipeline(input, { from: { category: STAGES[0].category } });
+            return;
+        }
+        const stageIndex = STAGES.findIndex(s => s.category === row.last_category);
+        if (stageIndex < 0)
+            return;
         if (stageIndex >= STAGES.length - 1) {
             // 最后阶段（review-code）已 success 但 merge 从未创建 → 补 merge（push + PR）
             await this.runMerge(input);

@@ -4,7 +4,7 @@
 > 每完成一项就把状态从「未完成」移到「已完成」并更新「最后更新」。
 > 计划明细见 [`docs/plans/`](./plans/00-overview.md)（00 总览 + 01–09 分计划）。
 
-最后更新：2026-08-16（v0.3.0 发布：使用说明落地 README/使用说明页 + 「迁移（建表）」按钮 + USAGE.md 随包分发）
+最后更新：2026-08-17（v0.3.3 发布：ADR-030 缺口僵尸修复 + §3.7 时段按阶段限时段，tag 已推送）
 
 ---
 
@@ -190,11 +190,40 @@
 - **生效前提**：host 代码改动需重启 dsh web（见 §3.1）；重启后自愈会对任何同类僵尸
   自动恢复（本部署当前运行实例 10:36 启动、仍为旧 lib，重启前不做自动恢复）。
 
+### 3.0.5 ✅ 本轮修复（2026-08-17 会话，代码已完成、测试 125/125 绿、已 build + dist 重组装）
+
+**ADR-030 卡死现场**（需求「MCP Server -- doc resource server」`4e9a685b`，用户报告「到代码审核又卡住、后续无运行无审核」）：
+
+- 现场取证（cm 库 + PM2 日志 + 会话存档）：6 阶段全部 success（review-code 于
+  08-16 22:35 CST 第 3 次运行成功，retry_count=2），**merge record 从未创建**，
+  5 张审核单全部 approved（无待办）；worktree `req-4e9a685b` 干净、领先 main 11
+  个提交、从未 push——典型「success 缺口」僵尸（ADR-025 同类，触发路径不同）。
+- 根因（两处叠加）：
+  1. **`retryRecord` 缺最后阶段接续**：review-code 失败 2 次后由自动重试路径
+     （`processRetryRow → retryRecord`）跑成功；该函数成功后只「从下一阶段
+     continue」——最后一阶段无下一阶段，**既不跑 merge 也不落任何记录**，任务
+     就地结束（`rerunWithFeedback` 驳回路径同缺陷，仅延后门 plan 有接续）。
+  2. **运行实例仍是旧 lib**：进程 08-16 18:06 CST 启动，缺口自愈在旧代码里只在
+     **启动第一个 tick**（recoverStartup）跑一次（当时该需求还不存在）；每轮
+     tick 的 `dispatchGaps()`（§3.7，21:21 构建）进程没加载 → 僵尸永久无人接管。
+- 修复（cm-worker pipeline.ts，src + build 已同步、mega/dist 已重组装）：
+  - `retryRecord`：最后阶段重试成功 → `runMerge(input)`（push + PR + merging）；
+  - `rerunWithFeedback`：成功后通用接续（延后门 → 锚点机审重走；其余 → 下一
+    阶段；最后阶段 → merge）。人审门不会被绕过——挂门阶段 runStage 返回
+    `'waiting'` 而非 `'success'`，与 `continueAfterGate` 语义一致。
+  - 测试 +1：「最后阶段重试成功后续跑 merge（no success-gap zombie）」全链断言
+    （复用 record、merge success、PR artifacts、需求 merging）。全套 125/125 绿。
+- **生效前提：重启 dsh web（PM2 `dsh`）**。重启后（当前处于 18→12 时段窗口内）
+  首个 tick `recoverStartup → listStuckGaps` 即捞出 `4e9a685b` → `resumeGap`
+  补 merge：push 11 个提交 + Gitee 建 PR → 需求 in_progress → merging，审核大厅
+  出现「待我合并」卡片；此后每轮 tick 的 dispatchGaps 兜底同类缺口。
+
 ### 3.1 🔴 重启 `dsh web` 使 host 插件生效（第一步，必须）
 
 - **为什么**：计划 09 明确记录「本部署禁 host 模块热重载」。当前运行实例
-  （pid 2541171，12:28 启动）内存中仍是旧代码：cm-flow lib 14:39 构建、
-  cm-worker lib 14:42 构建、patch 行 14:43 才加入，都晚于进程启动。
+  （pid 3259703，08-16 18:06 CST 启动）内存中仍是旧代码：§3.7 与 §3.0.5 的
+  cm-worker lib（08-17 09:25 构建）都晚于进程启动，重启前缺口自愈与新修复
+  均不生效。
   实测 `cordis_inspect_query`（host/Service）查 `pgmas`、`cmFlow` 均报
   `no catalogued Service` —— 插件未在运行实例中生效。
 - **验证方式（重启后）**：
@@ -278,12 +307,47 @@ ui-requirements 的修改、pnpm-lock.yaml。建议完成 §3.1–3.3 后再提�
   `runMigrations` 已导出并返回 `string[]`。
 - 版本 `0.2.0 → 0.3.0`，dist/mega 重新组装（含 assets/USAGE.md），测试 112/112 绿。
 
+### 3.7 ✅ 时段按阶段限时段（2026-08-16，测试 124/124 绿、已 build、dist 已重组装）
+
+**需求**：① 确认启用时段支持跨天夜间窗口（如 22:00→06:00）；② 支持勾选
+「仅某些阶段限时段」，未勾选阶段不限时段。
+
+**确认（①）**：`withinWindow` 的 `start>end` 分支即跨天窗口（`hour >= start
+|| hour < end`），cm-worker 与 mega 两份实现逐字一致，测试「跨天窗口：22:00→06:00」
+绿；配置页起/止为两个独立 0–23 下拉、`normalizeWorkerConfig` 各自钳制不强制
+start<end，22→06 可存可生效。
+
+**实现（②）**（cm-flow / cm-worker / mega / ui-requirements 四包同步改）：
+- **配置**：`WorkerConfig.timeWindowStages?: string[] | null`（jsonb payload，
+  无需迁移）——null/缺省 = 全部阶段受限（**旧语义完全兼容**：窗口外整轮跳过）；
+  数组（可空）= 仅勾选阶段受限。normalize 对非数组容错回 null。
+- **判定**：`stageWindowAllowed(config, category)`（pipeline 导出）：未启用恒
+  true；清单缺省 = withinWindow；清单外阶段恒 true；清单内按 withinWindow。
+- **链上延后**：`PipelineDeps.windowFor` 钩子（service 每 tick 重读配置后注入）；
+  `runStage`/`runMerge` 起跑前检查，受限且窗口外 → 返回 `'deferred'`，**不落
+  record 不动状态**，需求自然停在「上一阶段 success」的缺口态。
+- **派发过滤**（service tick）：领取按首阶段（decision）判——受限且窗口外不
+  领取（避免零 record 僵尸）；驳回/待决策放行重跑本阶段、失败重试均按该阶段
+  判，窗口外跳过（不消耗重试次数）；审核门通过只做记账跑下一阶段（下一阶段
+  受限由链上延后兜住）。
+- **缺口续跑每轮化**：新增 `dispatchGaps()`（每轮 tick 扫 `listStuckGaps`），
+  受限阶段进窗后自动接续；`listStuckGaps` 扩展匹配「领取后零 record」的竞态
+  残留（coalesce 'none'），`resumeGap` 对零 record 从首阶段整链跑起；缺口扫描
+  用 **inflight（requirement id）集合避让**在途领取/续跑/重试任务，防重复跑。
+- **面板**：配置页时段卡片新增「限时段的阶段」勾选组（Checkbox.Group，8 个
+  可配阶段）；remote schema 加 `timeWindowStages`（旧 host 不返回 → 视为全选）。
+  旧配置打开默认全勾（= null 全部受限），保存后落显式清单。
+- 测试 +7：stageWindowAllowed 4 例（缺省/空清单/清单内外/未启用）、normalize
+  5 断言、端到端延后链（plan 延后 → 进窗接续 → merge 延后 → 补 merge）、领取
+  竞态零 record 缺口恢复。全套 124/124 绿；`pnpm typecheck` 绿；四包 build +
+  `dist/mega` 重组装完成（旧 flow-repo chunk 换名 `pOAYSck9`）。
+
 ## 4. 环境速查
 
 | 项 | 值 |
 |---|---|
 | 仓库 | `/root/workspace/auto-coding-plugins` |
-| dsh 进程 | pid 2541171，`node /root/workspace/deepseek-harness/apps/cli/lib/bin.js`（12:28 启动，需重启） |
+| dsh 进程 | pid 3259703（PM2 `dsh`），08-16 18:06 CST 启动，待重启加载新 lib |
 | Web | 127.0.0.1:3080（webServer），0.0.0.0:3081（public gate，admin/admin123） |
 | pg-mas | docker `pg-mas`，host 25678，库 mas/cm/facai；模型工具 pg_query/pg_schema 只读 |
 | patch | `~/.dsh/profiles/web/cordis.patch.yml` |

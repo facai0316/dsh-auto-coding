@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import Button from '@douyinfe/semi-ui/lib/es/button'
+import Checkbox from '@douyinfe/semi-ui/lib/es/checkbox'
 import InputNumber from '@douyinfe/semi-ui/lib/es/inputNumber'
 import Select from '@douyinfe/semi-ui/lib/es/select'
 import Spin from '@douyinfe/semi-ui/lib/es/spin'
@@ -33,6 +34,8 @@ interface StageDraft {
 
 interface Draft {
   timeWindowEnabled: boolean
+  /** 受时段限制的阶段（category）；缺省（旧配置 null）在 toDraft 里展开为全选。 */
+  timeWindowStages: string[]
   startHour: number
   endHour: number
   concurrency: number
@@ -54,6 +57,8 @@ function toDraft(config: WorkerConfig): Draft {
   }
   return {
     timeWindowEnabled: config.timeWindowEnabled,
+    // null/缺省（旧配置）= 全部阶段受限 → 展开为全选；空数组 = 无阶段受限。
+    timeWindowStages: config.timeWindowStages ?? [...CONFIGURABLE_STAGES],
     startHour: config.startHour,
     endHour: config.endHour,
     concurrency: config.concurrency ?? 1,
@@ -84,6 +89,7 @@ function toConfig(draft: Draft): WorkerConfig {
   }
   return {
     timeWindowEnabled: draft.timeWindowEnabled,
+    timeWindowStages: draft.timeWindowStages,
     startHour: draft.startHour,
     endHour: draft.endHour,
     concurrency: Math.min(8, Math.max(1, Math.floor(draft.concurrency || 1))),
@@ -253,8 +259,21 @@ export function ConfigPage({ onError }: Props): ReactElement {
               />
             </div>
           </div>
+          {draft.timeWindowEnabled && (
+            <div className={classes.formField}>
+              <label>限时段的阶段（未勾选的不限时段）</label>
+              <Checkbox.Group
+                className={classes.stageChecks}
+                value={draft.timeWindowStages}
+                onChange={(value) => { patch({ timeWindowStages: (value ?? []).map(String) }) }}
+                options={CONFIGURABLE_STAGES.map(category => ({ label: STAGE_LABEL[category] ?? category, value: category }))}
+              />
+            </div>
+          )}
           <Typography.Text type="tertiary" size="small">
-            关闭时 24h 全时段运行；起=止视为不限；结束跨天（如 22:00→06:00）视为夜间窗口。窗口外 worker 不领取、不续跑、不重试。
+            关闭时 24h 全时段运行；起=止视为不限；结束跨天（如 22:00→06:00）视为夜间窗口。
+            勾选的阶段在窗口外不领取 / 不续跑 / 不重试（链上到该阶段时停下，进窗后续跑）；
+            未勾选的阶段 24h 可跑。旧配置未存清单时视为全部阶段受限。
           </Typography.Text>
         </div>
       </div>

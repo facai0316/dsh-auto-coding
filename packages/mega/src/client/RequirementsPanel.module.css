@@ -113,6 +113,15 @@
   width: 280px;
 }
 
+/* 时段卡片：受限阶段勾选组（横向换行排布） */
+.stageChecks {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  max-width: 640px;
+}
+
 .navRight {
   display: flex;
   align-items: center;

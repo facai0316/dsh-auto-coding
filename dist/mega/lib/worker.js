@@ -1,4 +1,4 @@
-import { a as ProjectsRepo, d as RequirementsRepo, f as ReviewsRepo, m as WorkerConfigRepo, o as QuestionsRepo, r as DEFAULT_WORKER_CONFIG } from "./flow-repo-CYXdfSKZ.js";
+import { a as ProjectsRepo, d as RequirementsRepo, f as ReviewsRepo, m as WorkerConfigRepo, o as QuestionsRepo, r as DEFAULT_WORKER_CONFIG } from "./flow-repo-pOAYSck9.js";
 import { existsSync, mkdirSync, readdirSync, symlinkSync } from "node:fs";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import { tmpdir } from "node:os";
@@ -349,6 +349,19 @@ function withinWindow(config, now = /* @__PURE__ */ new Date()) {
 	return hour >= start || hour < end;
 }
 /**
+* 每阶段时段门控：某阶段此刻是否允许起跑。
+* - 未启用时段 → 恒 true；
+* - 阶段清单缺省（null/undefined，旧配置）→ 全部阶段受限（等价 withinWindow）；
+* - 清单内阶段按 withinWindow 判定，清单外阶段（未勾选）恒 true（24h 可跑）。
+*/
+function stageWindowAllowed(config, category, now = /* @__PURE__ */ new Date()) {
+	if (config.timeWindowEnabled !== true) return true;
+	const limited = config.timeWindowStages;
+	if (limited === null || limited === void 0) return withinWindow(config, now);
+	if (!limited.includes(category)) return true;
+	return withinWindow(config, now);
+}
+/**
 * 并发 lanes：同时启动 `count` 个流水线（每个领取并跑一条需求）。
 * 领取用 `for update skip locked`，并发安全；返回实际跑起来的条数。
 * count 已由调用方钳制（1..MAX_CONCURRENCY）。
@@ -591,12 +604,13 @@ var WorkerPipeline = class {
 				userAnswers: resume.userAnswers
 			} : void 0;
 			const outcome = await this.runStage(input, stage, stageOpts);
-			if (outcome === "waiting" || outcome === "failed" || outcome === "terminated") return outcome;
+			if (outcome === "waiting" || outcome === "failed" || outcome === "terminated" || outcome === "deferred") return outcome;
 		}
 		return this.runMerge(input);
 	}
 	/** 单阶段：prompt → 会话 → 结构化结果 → 记账。带 recordId 时为续跑（复用该 record）。 */
 	async runStage(requirement, stage, opts) {
+		if (this.deps.windowFor !== void 0 && !this.deps.windowFor(stage.category)) return "deferred";
 		const recordId = opts?.recordId;
 		const userAnswers = opts?.userAnswers ?? [];
 		const feedback = opts?.feedback;
@@ -744,6 +758,7 @@ var WorkerPipeline = class {
 	* waiting_reply（用户补 token 或手动建 PR 后点「已合并」）。
 	*/
 	async runMerge(requirement, opts) {
+		if (this.deps.windowFor !== void 0 && !this.deps.windowFor("merge")) return "deferred";
 		const recordId = opts?.recordId;
 		const current = await this.deps.requirements.getById(requirement.id);
 		if (current !== void 0 && current.status === "terminated") {
@@ -1310,7 +1325,11 @@ var WorkerPipeline = class {
         returning r.id
       `))).rowCount ?? 0;
 	}
-	/** ⑤b 缺口僵尸行：in_progress 需求 + 最新 record = 阶段 success + 无挂起/失败 + 无 merge。 */
+	/**
+	* ⑤b 缺口僵尸行：in_progress 需求 + 最新 record = 阶段 success（或领取后
+	* 尚未落任何 record——领取与首阶段记账之间崩溃/被时段延后的竞态）+
+	* 无挂起/失败 + 无 merge。
+	*/
 	async listStuckGaps(limit = 5) {
 		return (await this.deps.pgmas.withClient(this.deps.database, (client) => client.query(`
         select r.id as requirement_id,
@@ -1327,21 +1346,23 @@ var WorkerPipeline = class {
             select 1 from records rc3
             where rc3.requirement_id = r.id::text and rc3.category = 'merge'
           )
-          -- 最新 record 必须是阶段 success（running/waiting/failed 由正常派发路径接管；
-          -- 更早的 failed（重试后成功）不影响缺口判定）
-          and (
+          -- 最新 record 必须是阶段 success，或根本没有 record（领取后竞态残留；
+          -- running/waiting/failed 由正常派发路径接管，更早的 failed（重试后
+          -- 成功）不影响缺口判定）
+          and coalesce((
             select rc4.status from records rc4
             where rc4.requirement_id = r.id::text
             order by rc4.created_at desc, rc4.id desc limit 1
-          ) = 'success'
+          ), 'none') in ('success', 'none')
         order by r.updated_at asc
         limit $1
       `, [limit]))).rows;
 	}
-	/** ⑤c 续跑一条缺口僵尸：最后阶段 success → 补 merge；中途缺口 → 从下一阶段继续。 */
+	/**
+	* ⑤c 续跑一条缺口僵尸：无 record（领取竞态）→ 从首阶段跑起；最后阶段
+	* success → 补 merge；中途缺口 → 从下一阶段继续。
+	*/
 	async resumeGap(row) {
-		const stageIndex = STAGES.findIndex((s) => s.category === row.last_category);
-		if (stageIndex < 0) return;
 		const requirement = await this.deps.requirements.getById(row.requirement_id);
 		if (requirement === void 0 || requirement.status !== "in_progress") return;
 		if (requirement.projectId === null) return;
@@ -1359,6 +1380,12 @@ var WorkerPipeline = class {
 				branch
 			}
 		};
+		if (row.last_category === null || row.last_category === "") {
+			await this.runPipeline(input, { from: { category: STAGES[0].category } });
+			return;
+		}
+		const stageIndex = STAGES.findIndex((s) => s.category === row.last_category);
+		if (stageIndex < 0) return;
 		if (stageIndex >= STAGES.length - 1) {
 			await this.runMerge(input);
 			return;
@@ -1640,6 +1667,8 @@ var CmWorkerService = class extends Service {
 	waiters = [];
 	/** 已派发、尚未落定的 record id（防同一审核/重试动作被多轮 tick 重复派发）。 */
 	dispatched = /* @__PURE__ */ new Set();
+	/** 在途整链任务（requirement id）：领取/续跑/重试/缺口任务运行期间，缺口扫描不得对同一需求再派发。 */
+	inflight = /* @__PURE__ */ new Set();
 	/** 启动自愈（僵尸/残留恢复）只执行一次（见 tick 首个分支）。 */
 	startupRecovered = false;
 	constructor(ctx, config = {
@@ -1746,6 +1775,7 @@ var CmWorkerService = class extends Service {
 					...maxTokens !== void 0 ? { maxTokens } : {}
 				};
 			},
+			windowFor: (category) => this.windowFor(category),
 			dispatchBackground: (task) => {
 				this.withSlot(task).catch((error) => console.warn(`[cm-worker] 后台任务异常: ${error instanceof Error ? error.message : String(error)}`));
 			},
@@ -1763,17 +1793,22 @@ var CmWorkerService = class extends Service {
 		new MergeService(ctx, (id) => this.pipeline.startResolve(id));
 	}
 	/**
-	* 串行 tick：读配置 → 时段门控 → 短派发（领取 / 审核续跑 / 重试，受全局并发
-	* 预算约束）→ 收尾。tick 本身只做快查询与派发，不阻塞在长流水线上：每条
-	* 领取 / 续跑 / 重试都以后台任务运行，槽位在流水线挂起（进审核门）或完成时
+	* 串行 tick：读配置 → 时段门控 → 短派发（领取 / 审核续跑 / 重试 / 缺口续跑，
+	* 受全局并发预算约束）→ 收尾。tick 本身只做快查询与派发，不阻塞在长流水线上：
+	* 每条领取 / 续跑 / 重试都以后台任务运行，槽位在流水线挂起（进审核门）或完成时
 	* 释放——审核放行逐条到来也能按预算并发续跑（10s 一轮，槽位空出即补）。
 	* 任一异常静默下轮重试。
+	*
+	* 时段门控两级：阶段清单缺省（旧配置）= 全部阶段受限，窗口外整轮跳过
+	* （与历史行为一致）；配置了清单则按阶段过滤派发——受限阶段窗口外不领取/
+	* 不续跑/不重试，未勾选阶段 24h 可跑；阶段链中途受限的，由 runStage 返回
+	* 'deferred' 停在缺口态，窗口开启后经 dispatchGaps 接续。
 	*/
 	async tick() {
 		this.running = true;
 		try {
 			this.config = await this.configRepo.get();
-			if (!withinWindow(this.config)) return;
+			if (this.config.timeWindowEnabled === true && this.config.timeWindowStages == null && !withinWindow(this.config)) return;
 			if (!this.startupRecovered) {
 				this.startupRecovered = true;
 				await this.recoverStartup();
@@ -1782,6 +1817,7 @@ var CmWorkerService = class extends Service {
 			await this.dispatchClaims();
 			await this.dispatchReviews();
 			await this.dispatchRetries();
+			await this.dispatchGaps();
 			await this.pipeline.finalizeMerged();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
@@ -1789,6 +1825,10 @@ var CmWorkerService = class extends Service {
 		} finally {
 			this.running = false;
 		}
+	}
+	/** 每阶段时段门控：该阶段此刻是否允许起跑（清单外/未启用恒 true）。 */
+	windowFor(category) {
+		return stageWindowAllowed(this.config, category);
 	}
 	/** 全局并发预算：当前配置的 concurrency（1..MAX_CONCURRENCY 钳制）。 */
 	budget() {
@@ -1815,15 +1855,21 @@ var CmWorkerService = class extends Service {
 			this.releaseSlot();
 		}
 	}
-	/** 后台派发一个占槽任务：异常落日志，落定（成功/失败）即释放槽位。 */
-	dispatchTask(fn, what, onSettled) {
+	/**
+	* 后台派发一个占槽任务：异常落日志，落定（成功/失败）即释放槽位。
+	* inflightId（requirement id）任务在途期间登记进 inflight，供缺口扫描避让。
+	*/
+	dispatchTask(fn, what, onSettled, inflightId) {
+		if (inflightId !== void 0) this.inflight.add(inflightId);
 		fn().catch((error) => console.warn(`[cm-worker] 后台任务 ${what} 异常: ${error instanceof Error ? error.message : String(error)}`)).finally(() => {
+			if (inflightId !== void 0) this.inflight.delete(inflightId);
 			if (onSettled !== void 0) onSettled();
 			this.releaseSlot();
 		});
 	}
 	/** 派发领取：按预算逐个原子领取 open 需求（for update skip locked 互斥），各自后台跑阶段链。 */
 	async dispatchClaims() {
+		if (!this.windowFor(STAGES[0].category)) return;
 		while (this.trySlot()) {
 			let claim;
 			try {
@@ -1836,7 +1882,7 @@ var CmWorkerService = class extends Service {
 				this.releaseSlot();
 				return;
 			}
-			this.dispatchTask(() => this.pipeline.runClaimed(claim), `领取 ${claim.id.slice(0, 8)}`);
+			this.dispatchTask(() => this.pipeline.runClaimed(claim), `领取 ${claim.id.slice(0, 8)}`, void 0, claim.id);
 		}
 	}
 	/** 派发审核续跑：补 reply 单后，把已放行/驳回的记录按预算逐个后台续跑（多记录可并行）。 */
@@ -1845,9 +1891,12 @@ var CmWorkerService = class extends Service {
 		const actions = await this.pipeline.listActionableReviews();
 		for (const action of actions) {
 			if (this.dispatched.has(action.record_id)) continue;
+			if (action.review_status === "rejected" || action.review_kind === "reply") {
+				if (!this.windowFor(action.category)) continue;
+			}
 			if (!this.trySlot()) break;
 			this.dispatched.add(action.record_id);
-			this.dispatchTask(() => this.pipeline.processReviewAction(action), `审核续跑 record ${action.record_id.slice(0, 8)}`, () => this.dispatched.delete(action.record_id));
+			this.dispatchTask(() => this.pipeline.processReviewAction(action), `审核续跑 record ${action.record_id.slice(0, 8)}`, () => this.dispatched.delete(action.record_id), action.requirement_id);
 		}
 	}
 	/** 派发重试：把可重试的 failed record 按预算逐个后台重跑（可并行）。 */
@@ -1855,9 +1904,30 @@ var CmWorkerService = class extends Service {
 		const rows = await this.pipeline.listRetryable();
 		for (const row of rows) {
 			if (this.dispatched.has(row.record_id)) continue;
+			if (!this.windowFor(row.category)) continue;
 			if (!this.trySlot()) break;
 			this.dispatched.add(row.record_id);
-			this.dispatchTask(() => this.pipeline.processRetryRow(row), `重试 record ${row.record_id.slice(0, 8)}`, () => this.dispatched.delete(row.record_id));
+			this.dispatchTask(() => this.pipeline.processRetryRow(row), `重试 record ${row.record_id.slice(0, 8)}`, () => this.dispatched.delete(row.record_id), row.requirement_id);
+		}
+	}
+	/**
+	* 派发缺口续跑（每轮 tick）：扫描「in_progress + 最新 record = 阶段 success
+	* （或领取后尚无 record）+ 无挂起/失败 + 无 merge」的缺口需求，按预算后台
+	* 从下一阶段续跑。
+	*
+	* 覆盖三类缺口：① 进程崩溃/重启遗留（原启动自愈路径，现每轮兜底）；
+	* ② 阶段链中途被时段门控延后的（runStage 返回 'deferred'，不落 record，
+	* 需求自然停在上一阶段 success 的缺口态）——受限阶段进入窗口后即由此接续；
+	* ③ 领取后尚未落 record 的竞态残留（从首阶段跑起）。
+	* 在途整链任务（inflight）避让，防止与领取/续跑/重试并行重跑同一需求；
+	* 下一阶段仍受限时 resumeGap → runStage 再次延后，只耗几次快查询。
+	*/
+	async dispatchGaps() {
+		const gaps = await this.pipeline.listStuckGaps();
+		for (const gap of gaps) {
+			if (this.inflight.has(gap.requirement_id)) continue;
+			if (!this.trySlot()) break;
+			this.dispatchTask(() => this.pipeline.resumeGap(gap), `缺口续跑 ${gap.requirement_id.slice(0, 8)}`, void 0, gap.requirement_id);
 		}
 	}
 	/**
@@ -1871,10 +1941,9 @@ var CmWorkerService = class extends Service {
 			if (stale > 0) console.warn(`[cm-worker] 启动自愈：${stale} 条残留 running record 已转 failed（等待自动重试）`);
 			const gaps = await this.pipeline.listStuckGaps();
 			for (const gap of gaps) {
-				if (this.dispatched.has(gap.requirement_id)) continue;
+				if (this.inflight.has(gap.requirement_id)) continue;
 				if (!this.trySlot()) break;
-				this.dispatched.add(gap.requirement_id);
-				this.dispatchTask(() => this.pipeline.resumeGap(gap), `缺口续跑 ${gap.requirement_id.slice(0, 8)}`, () => this.dispatched.delete(gap.requirement_id));
+				this.dispatchTask(() => this.pipeline.resumeGap(gap), `缺口续跑 ${gap.requirement_id.slice(0, 8)}`, void 0, gap.requirement_id);
 			}
 		} catch (error) {
 			console.warn(`[cm-worker] 启动自愈异常（下轮不再重试，可人工介入）: ${error instanceof Error ? error.message : String(error)}`);
@@ -1882,4 +1951,4 @@ var CmWorkerService = class extends Service {
 	}
 };
 //#endregion
-export { DEFAULT_DATABASE, DEFAULT_MAX_RETRIES, DEFAULT_POLL_MS, DEFAULT_STAGE_TIMEOUT_MS, DEFAULT_SUBAGENT_PROVIDER, MergeService, PR_RESULT_SCHEMA, STAGE_RESULT_SCHEMA, WorkerPipeline, buildPrPrompt, buildPrompt, buildResolvePrompt, CmWorkerService as default, runLanes, withinWindow };
+export { DEFAULT_DATABASE, DEFAULT_MAX_RETRIES, DEFAULT_POLL_MS, DEFAULT_STAGE_TIMEOUT_MS, DEFAULT_SUBAGENT_PROVIDER, MergeService, PR_RESULT_SCHEMA, STAGE_RESULT_SCHEMA, WorkerPipeline, buildPrPrompt, buildPrompt, buildResolvePrompt, CmWorkerService as default, runLanes, stageWindowAllowed, withinWindow };

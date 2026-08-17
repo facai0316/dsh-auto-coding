@@ -255,6 +255,7 @@ describe.skipIf(!(await reachable()))('WorkerConfigRepo against the live cm data
 
       const saved = await repo.set({
         timeWindowEnabled: true,
+        timeWindowStages: ['coding', 'merge'],
         startHour: 9,
         endHour: 18,
         concurrency: 3,
@@ -269,9 +270,11 @@ describe.skipIf(!(await reachable()))('WorkerConfigRepo against the live cm data
       expect(saved.stages.decision?.model).toBe('deepseek-v4-pro')
       expect(saved.stages.coding?.maxTokens).toBe(8192)
       expect(saved.concurrency).toBe(3)
+      expect(saved.timeWindowStages).toEqual(['coding', 'merge'])
 
       const read = await repo.get()
       expect(read.timeWindowEnabled).toBe(true)
+      expect(read.timeWindowStages).toEqual(['coding', 'merge'])
       expect(read.stages.decision?.model).toBe('deepseek-v4-pro')
       expect(read.stages.coding?.model).toBe('deepseek-v4-flash')
       expect(read.defaultMaxTokens).toBe(4096)
@@ -297,6 +300,13 @@ describe.skipIf(!(await reachable()))('WorkerConfigRepo against the live cm data
     expect(normalizeWorkerConfig({ concurrency: 99 }).concurrency).toBe(MAX_CONCURRENCY)
     expect(normalizeWorkerConfig({ concurrency: 4.9 }).concurrency).toBe(4)
     expect(normalizeWorkerConfig({ concurrency: 'abc' }).concurrency).toBe(1)
+    // 时段阶段清单：null/缺省/非数组 → null（全部阶段受限，旧语义）；数组只留字符串项
+    expect(normalizeWorkerConfig({})).toMatchObject({ timeWindowStages: null })
+    expect(normalizeWorkerConfig({ timeWindowStages: null })).toMatchObject({ timeWindowStages: null })
+    expect(normalizeWorkerConfig({ timeWindowStages: 'coding' })).toMatchObject({ timeWindowStages: null })
+    expect(normalizeWorkerConfig({ timeWindowStages: [] })).toMatchObject({ timeWindowStages: [] })
+    expect(normalizeWorkerConfig({ timeWindowStages: ['coding', 'merge'] })).toMatchObject({ timeWindowStages: ['coding', 'merge'] })
+    expect(normalizeWorkerConfig({ timeWindowStages: ['coding', 42, null] })).toMatchObject({ timeWindowStages: ['coding'] })
   })
 })
 

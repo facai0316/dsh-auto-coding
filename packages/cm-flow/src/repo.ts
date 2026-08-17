@@ -139,6 +139,12 @@ export interface StageModelConfig {
 export interface WorkerConfig {
   /** 是否启用「仅指定时段运行」。false = 24h 全时段。 */
   timeWindowEnabled: boolean
+  /**
+   * 时段限制作用的阶段清单（records.category；merge/resolve 亦属阶段）。
+   * null/缺省 = 全部阶段受限（旧语义，窗口外 worker 整轮不派发）；
+   * 数组（可为空）= 仅勾选阶段受限时段，未勾选阶段 24h 可跑。
+   */
+  timeWindowStages?: string[] | null
   /** 起始小时（0-23，含）。 */
   startHour: number
   /** 结束小时（0-23，不含；start>end 视为跨天窗口）。 */
@@ -157,6 +163,7 @@ export interface WorkerConfig {
 
 export const DEFAULT_WORKER_CONFIG: WorkerConfig = {
   timeWindowEnabled: false,
+  timeWindowStages: null,
   startHour: 9,
   endHour: 18,
   concurrency: 1,
@@ -198,8 +205,15 @@ export function normalizeWorkerConfig(input: unknown): WorkerConfig {
     if (!Number.isFinite(parsed)) return DEFAULT_WORKER_CONFIG.concurrency
     return Math.min(MAX_CONCURRENCY, Math.max(1, Math.floor(parsed)))
   }
+  // 阶段清单：null/缺省/非数组 → null（全部阶段受限，旧语义）；数组则只留字符串项。
+  const stageList = (candidate: unknown): string[] | null => {
+    if (candidate === null || candidate === undefined) return null
+    if (!Array.isArray(candidate)) return null
+    return candidate.filter((entry): entry is string => typeof entry === 'string')
+  }
   return {
     timeWindowEnabled: value.timeWindowEnabled === true,
+    timeWindowStages: stageList(value.timeWindowStages),
     startHour: clampHour(value.startHour, DEFAULT_WORKER_CONFIG.startHour),
     endHour: clampHour(value.endHour, DEFAULT_WORKER_CONFIG.endHour),
     concurrency: clampConcurrency(value.concurrency),

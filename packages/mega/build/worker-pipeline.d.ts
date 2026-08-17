@@ -65,6 +65,13 @@ export interface StageAgentOptions {
  */
 export declare function withinWindow(config: Pick<WorkerConfig, 'timeWindowEnabled' | 'startHour' | 'endHour'>, now?: Date): boolean;
 /**
+ * 每阶段时段门控：某阶段此刻是否允许起跑。
+ * - 未启用时段 → 恒 true；
+ * - 阶段清单缺省（null/undefined，旧配置）→ 全部阶段受限（等价 withinWindow）；
+ * - 清单内阶段按 withinWindow 判定，清单外阶段（未勾选）恒 true（24h 可跑）。
+ */
+export declare function stageWindowAllowed(config: Pick<WorkerConfig, 'timeWindowEnabled' | 'startHour' | 'endHour' | 'timeWindowStages'>, category: string, now?: Date): boolean;
+/**
  * 并发 lanes：同时启动 `count` 个流水线（每个领取并跑一条需求）。
  * 领取用 `for update skip locked`，并发安全；返回实际跑起来的条数。
  * count 已由调用方钳制（1..MAX_CONCURRENCY）。
@@ -173,6 +180,12 @@ export interface PipelineDeps {
     /** 某阶段（或 merge）的模型覆盖；无配置时返回 undefined（继承父 agent）。 */
     configFor: (category: string) => StageAgentOptions | undefined;
     /**
+     * 每阶段时段门控：该阶段此刻是否允许起跑（false → 阶段链返回 'deferred'，
+     * 不落任何 record，需求停在上一阶段 success 的可续跑缺口，窗口开后由缺口
+     * 续跑接上）。未提供 = 不限时段（测试/串行场景）。
+     */
+    windowFor?: (category: string) => boolean;
+    /**
      * 后台任务派发钩子（service 注入全局并发预算）；未提供则直接 fire-and-forget。
      * 冲突解决等用户触发的长任务经此排队执行（预算满时排队，槽位空出即跑）。
      */
@@ -280,7 +293,7 @@ export declare class WorkerPipeline {
         from?: {
             category: string;
         };
-    }): Promise<'success' | 'waiting' | 'failed' | 'terminated'>;
+    }): Promise<'success' | 'waiting' | 'failed' | 'terminated' | 'deferred'>;
     /** 单阶段：prompt → 会话 → 结构化结果 → 记账。带 recordId 时为续跑（复用该 record）。 */
     runStage(requirement: {
         id: string;
@@ -296,7 +309,7 @@ export declare class WorkerPipeline {
         }[];
         retry?: boolean;
         feedback?: string;
-    }): Promise<'success' | 'waiting' | 'failed' | 'terminated'>;
+    }): Promise<'success' | 'waiting' | 'failed' | 'terminated' | 'deferred'>;
     /**
      * merge 阶段：push 分支 → PR agent 任务 → `markMerging`（in_progress→merging，
      * 记 merge record artifacts=[pr_url]）。无 token / 建 PR 失败 → 挂起
@@ -310,7 +323,7 @@ export declare class WorkerPipeline {
         wt: WorktreeHandleLike;
     }, opts?: {
         recordId?: string;
-    }): Promise<'success' | 'waiting' | 'failed' | 'terminated'>;
+    }): Promise<'success' | 'waiting' | 'failed' | 'terminated' | 'deferred'>;
     /**
      * 「解决冲突」任务（merge 阶段的用户按钮触发）：把任务分支与远端 main 同步
      * （fetch + merge）、解决合并冲突、commit + push。需要用户决策时不中断——
@@ -420,9 +433,16 @@ export declare class WorkerPipeline {
      * 无任何在途会话，恢复任务不会与正常派发抢跑（避免重复 merge/重复建 PR）。
      */
     markStaleRunning(): Promise<number>;
-    /** ⑤b 缺口僵尸行：in_progress 需求 + 最新 record = 阶段 success + 无挂起/失败 + 无 merge。 */
+    /**
+     * ⑤b 缺口僵尸行：in_progress 需求 + 最新 record = 阶段 success（或领取后
+     * 尚未落任何 record——领取与首阶段记账之间崩溃/被时段延后的竞态）+
+     * 无挂起/失败 + 无 merge。
+     */
     listStuckGaps(limit?: number): Promise<GapRow[]>;
-    /** ⑤c 续跑一条缺口僵尸：最后阶段 success → 补 merge；中途缺口 → 从下一阶段继续。 */
+    /**
+     * ⑤c 续跑一条缺口僵尸：无 record（领取竞态）→ 从首阶段跑起；最后阶段
+     * success → 补 merge；中途缺口 → 从下一阶段继续。
+     */
     resumeGap(row: GapRow): Promise<void>;
     /** 该需求最近成功的 record artifacts（供下阶段上下文）。 */
     private priorArtifacts;

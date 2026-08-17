@@ -107,6 +107,8 @@ export type StageModelConfig = z.infer<typeof stageModelConfigSchema>
 
 export const workerConfigSchema = z.object({
   timeWindowEnabled: z.boolean(),
+  // 旧 host（未重启）不返回该字段；null 视为「全部阶段受限」（旧语义）。
+  timeWindowStages: z.array(z.string()).nullable().optional(),
   startHour: z.number(),
   endHour: z.number(),
   // 旧 host（未重启）不返回该字段；客户端回退默认 1。
