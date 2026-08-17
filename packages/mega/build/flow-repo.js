@@ -320,6 +320,7 @@ export class RequirementsRepo {
         this.database = options.database ?? DEFAULT_DATABASE;
         this.userId = options.userId ?? DEFAULT_USER_ID;
         this.ready = runMigrations(this.pgmas, this.database, this.userId);
+        this.ready.catch(() => { }); // 数据库暂不可达不击穿启动；拒绝语义保留给各方法（面板显示连接失败，改配置后可「迁移」重试）
     }
     async list(options) {
         await this.ready;
@@ -655,6 +656,7 @@ export class ProjectsRepo {
         this.pgmas = options.pgmas;
         this.database = options.database ?? DEFAULT_DATABASE;
         this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID);
+        this.ready.catch(() => { }); // 同上：no-op catch 防 unhandledRejection fatal
     }
     async list() {
         await this.ready;
@@ -789,6 +791,7 @@ export class QuestionsRepo {
         this.pgmas = options.pgmas;
         this.database = options.database ?? DEFAULT_DATABASE;
         this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID);
+        this.ready.catch(() => { }); // 同上：no-op catch 防 unhandledRejection fatal
     }
     async insertMany(recordId, questions) {
         await this.ready;
@@ -834,6 +837,7 @@ export class ReviewsRepo {
         this.pgmas = options.pgmas;
         this.database = options.database ?? DEFAULT_DATABASE;
         this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID);
+        this.ready.catch(() => { }); // 同上：no-op catch 防 unhandledRejection fatal
     }
     /** Worker：为 record 挂一张 pending 审核单。 */
     async create(recordId, kind) {
@@ -974,6 +978,7 @@ export class WorkerConfigRepo {
         this.pgmas = options.pgmas;
         this.database = options.database ?? DEFAULT_DATABASE;
         this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID);
+        this.ready.catch(() => { }); // 同上：no-op catch 防 unhandledRejection fatal
     }
     /** 读取当前配置；无行时返回默认值。 */
     async get() {

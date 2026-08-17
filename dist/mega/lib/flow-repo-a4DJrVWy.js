@@ -343,6 +343,7 @@ var RequirementsRepo = class {
 		this.database = options.database ?? "cm";
 		this.userId = options.userId ?? "00000000-0000-4000-8000-000000000001";
 		this.ready = runMigrations(this.pgmas, this.database, this.userId);
+		this.ready.catch(() => {});
 	}
 	async list(options) {
 		await this.ready;
@@ -644,6 +645,7 @@ var ProjectsRepo = class {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
 		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready.catch(() => {});
 	}
 	async list() {
 		await this.ready;
@@ -766,6 +768,7 @@ var QuestionsRepo = class {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
 		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready.catch(() => {});
 	}
 	async insertMany(recordId, questions) {
 		await this.ready;
@@ -808,6 +811,7 @@ var ReviewsRepo = class {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
 		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready.catch(() => {});
 	}
 	/** Worker：为 record 挂一张 pending 审核单。 */
 	async create(recordId, kind) {
@@ -933,6 +937,7 @@ var WorkerConfigRepo = class {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
 		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready.catch(() => {});
 	}
 	/** 读取当前配置；无行时返回默认值。 */
 	async get() {

@@ -497,6 +497,12 @@ export class RequirementsRepo {
     this.database = options.database ?? DEFAULT_DATABASE
     this.userId = options.userId ?? DEFAULT_USER_ID
     this.ready = runMigrations(this.pgmas, this.database, this.userId)
+    // 数据库暂不可达（如目标机器尚未配置连接/PG 未启动）不得击穿整个 dsh 启动：
+    // 这里同步挂一个 no-op catch 把 rejection 标记为已处理（否则 Node
+    // unhandledRejection 直接 fatal 整个进程）；ready 的拒绝语义保留——每个
+    // repo 方法 await this.ready 时仍会拿到真实错误，面板显示连接失败、
+    // 用户改好配置后用「迁移」按钮重试即可，无需重启。
+    this.ready.catch(() => {})
   }
 
   async list(options?: { projectId?: string }): Promise<RequirementWithStages[]> {
@@ -886,6 +892,7 @@ export class ProjectsRepo {
     this.pgmas = options.pgmas
     this.database = options.database ?? DEFAULT_DATABASE
     this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID)
+    this.ready.catch(() => {}) // 数据库暂不可达不击穿启动；拒绝语义保留给各方法（见 RequirementsRepo 构造注释）
   }
 
   async list(): Promise<ProjectView[]> {
@@ -1030,6 +1037,7 @@ export class QuestionsRepo {
     this.pgmas = options.pgmas
     this.database = options.database ?? DEFAULT_DATABASE
     this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID)
+    this.ready.catch(() => {}) // 数据库暂不可达不击穿启动；拒绝语义保留给各方法（见 RequirementsRepo 构造注释）
   }
 
   async insertMany(recordId: string, questions: { question: string; options: string[] }[]): Promise<void> {
@@ -1094,6 +1102,7 @@ export class ReviewsRepo {
     this.pgmas = options.pgmas
     this.database = options.database ?? DEFAULT_DATABASE
     this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID)
+    this.ready.catch(() => {}) // 数据库暂不可达不击穿启动；拒绝语义保留给各方法（见 RequirementsRepo 构造注释）
   }
 
   /** Worker：为 record 挂一张 pending 审核单。 */
@@ -1265,6 +1274,7 @@ export class WorkerConfigRepo {
     this.pgmas = options.pgmas
     this.database = options.database ?? DEFAULT_DATABASE
     this.ready = runMigrations(this.pgmas, this.database, options.userId ?? DEFAULT_USER_ID)
+    this.ready.catch(() => {}) // 数据库暂不可达不击穿启动；拒绝语义保留给各方法（见 RequirementsRepo 构造注释）
   }
 
   /** 读取当前配置；无行时返回默认值。 */
