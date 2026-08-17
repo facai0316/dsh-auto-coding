@@ -139,23 +139,78 @@ function assertRecordStatus(value) {
 function canTransition(from, to) {
 	return from !== to && TRANSITIONS[from].includes(to);
 }
-/**
-* Forward migrations owned by this plugin. Version 1 is a baseline assertion
-* (SeaORM schema must already exist); v2-v4 add the pipeline data model.
-*/
-const MIGRATIONS = [
-	{
-		version: 1,
-		name: "baseline: assert SeaORM requirements table exists",
-		apply: async (client) => {
-			await client.query("select 1 from requirements limit 1");
-		}
-	},
-	{
-		version: 2,
-		name: "projects table + seed fac-ai-rs",
-		apply: async (client) => {
-			await client.query(`
+const MIGRATIONS = [...[
+	1,
+	2,
+	3,
+	4,
+	5,
+	6,
+	7
+].map((version) => ({
+	version,
+	name: `historical v${version} (no-op; superseded by v8 self-contained schema)`,
+	apply: async (_client) => {}
+})), {
+	version: 8,
+	name: "self-contained schema from scratch, no foreign keys (indexes instead)",
+	apply: async (client) => {
+		await client.query(`
+        create table if not exists users (
+          id            uuid primary key,
+          email         varchar(255) not null unique,
+          password_hash varchar(255) not null,
+          nickname      varchar(255),
+          created_at    timestamptz not null default now(),
+          updated_at    timestamptz not null default now()
+        )
+      `);
+		await client.query(`
+        create table if not exists requirements (
+          id          uuid primary key,
+          user_id     uuid not null,
+          title       varchar(255) not null,
+          description text,
+          status      varchar(32) not null default 'draft',
+          project_id  uuid,
+          created_at  timestamptz not null default now(),
+          updated_at  timestamptz not null default now()
+        )
+      `);
+		await client.query(`
+        create table if not exists records (
+          id             uuid primary key,
+          category       varchar(32) not null,
+          title          varchar(255) not null,
+          message        text,
+          result         text,
+          "references"  text[] not null default '{}',   -- references 是保留字，需引号
+          artifacts      text[] not null default '{}',
+          skills         text[] not null default '{}',
+          parent_id      varchar(255),
+          child_id       varchar(255),
+          branch_id      varchar(255),
+          task_id        varchar(255),
+          status         varchar(32) not null default 'pending_approval',
+          requirement_id varchar(255),
+          retry_count    integer not null default 0,
+          created_at     timestamptz not null default now(),
+          updated_at     timestamptz not null default now()
+        )
+      `);
+		await client.query(`
+        create table if not exists branches (
+          id              uuid primary key,
+          name            varchar(255) not null unique,
+          description     text,
+          begin_record_id varchar(255),
+          auto_delete     boolean not null default false,
+          merge_time      timestamptz,
+          created_at      timestamptz not null default now(),
+          updated_at      timestamptz not null default now()
+        )
+      `);
+		await client.query(`
         create table if not exists projects (
           id          uuid primary key default gen_random_uuid(),
           name        varchar not null,
@@ -167,7 +222,42 @@ const MIGRATIONS = [
           updated_at  timestamptz not null default now()
         )
       `);
-			await client.query(`
+		await client.query(`
+        create table if not exists ask_user_questions (
+          id          uuid primary key default gen_random_uuid(),
+          record_id   uuid not null,
+          question    text not null,
+          options     text[] not null default '{}',
+          status      varchar not null default 'pending', -- 'pending' | 'answered'
+          answer      text,
+          created_at  timestamptz not null default now(),
+          answered_at timestamptz
+        )
+      `);
+		await client.query(`
+        create table if not exists worker_config (
+          id         integer primary key default 1 check (id = 1),
+          payload    jsonb not null,
+          updated_at timestamptz not null default now()
+        )
+      `);
+		await client.query(`
+        create table if not exists reviews (
+          id          uuid primary key default gen_random_uuid(),
+          record_id   uuid not null,
+          kind        varchar not null default 'review',  -- 'review' | 'reply'
+          status      varchar not null default 'pending', -- 'pending' | 'approved' | 'rejected'
+          feedback    text,                               -- 驳回时的整改意见
+          created_at  timestamptz not null default now(),
+          decided_at  timestamptz
+        )
+      `);
+		await client.query(`
+        insert into users (id, email, password_hash, nickname, created_at, updated_at)
+        values ('00000000-0000-4000-8000-00000000fffc', 'dsh@cm.local', '', 'dsh', now(), now())
+        on conflict (id) do nothing
+      `);
+		await client.query(`
         insert into projects (id, name, local_path, git_url, platform)
         select '00000000-0000-4000-8000-0000000000c1',
                'fac-ai-rs',
@@ -176,86 +266,15 @@ const MIGRATIONS = [
                'gitee'
         where not exists (select 1 from projects where local_path = '/root/workspace/rust/fac-ai-rs')
       `);
-		}
-	},
-	{
-		version: 3,
-		name: "requirements.project_id + open index",
-		apply: async (client) => {
-			await client.query("alter table requirements add column project_id uuid references projects(id)");
-			await client.query(`
-        create index if not exists requirements_project_open_idx
-          on requirements(project_id)
-          where status = 'open'
-      `);
-		}
-	},
-	{
-		version: 4,
-		name: "ask_user_questions table + pending index",
-		apply: async (client) => {
-			await client.query(`
-        create table if not exists ask_user_questions (
-          id          uuid primary key default gen_random_uuid(),
-          record_id   uuid not null references records(id) on delete cascade,
-          question    text not null,
-          options     text[] not null default '{}',
-          status      varchar not null default 'pending',   -- 'pending' | 'answered'
-          answer      text,
-          created_at  timestamptz not null default now(),
-          answered_at timestamptz
-        )
-      `);
-			await client.query(`
-        create index if not exists ask_user_questions_pending_idx
-          on ask_user_questions(record_id)
-          where status = 'pending'
-      `);
-		}
-	},
-	{
-		version: 5,
-		name: "worker_config singleton table (time window + per-stage model)",
-		apply: async (client) => {
-			await client.query(`
-        create table if not exists worker_config (
-          id         integer primary key default 1 check (id = 1),
-          payload    jsonb not null,
-          updated_at timestamptz not null default now()
-        )
-      `);
-		}
-	},
-	{
-		version: 6,
-		name: "records.retry_count column (worker reuses the record on retry)",
-		apply: async (client) => {
-			await client.query("alter table records add column if not exists retry_count integer not null default 0");
-		}
-	},
-	{
-		version: 7,
-		name: "reviews table (human review gates + reply release tickets)",
-		apply: async (client) => {
-			await client.query(`
-        create table if not exists reviews (
-          id          uuid primary key default gen_random_uuid(),
-          record_id   uuid not null references records(id) on delete cascade,
-          kind        varchar not null default 'review',   -- 'review' | 'reply'
-          status      varchar not null default 'pending',  -- 'pending' | 'approved' | 'rejected'
-          feedback    text,                                -- 驳回时的整改意见
-          created_at  timestamptz not null default now(),
-          decided_at  timestamptz
-        )
-      `);
-			await client.query(`
-        create index if not exists reviews_pending_idx
-          on reviews(record_id)
-          where status = 'pending'
-      `);
-		}
+		await client.query("create index if not exists requirements_project_open_idx on requirements(project_id) where status = 'open'");
+		await client.query("create index if not exists requirements_project_idx on requirements(project_id)");
+		await client.query("create index if not exists records_requirement_created_idx on records(requirement_id, created_at)");
+		await client.query("create index if not exists ask_user_questions_pending_idx on ask_user_questions(record_id) where status = 'pending'");
+		await client.query("create index if not exists ask_user_questions_record_idx on ask_user_questions(record_id)");
+		await client.query("create index if not exists reviews_pending_idx on reviews(record_id) where status = 'pending'");
+		await client.query("create index if not exists reviews_record_idx on reviews(record_id)");
 	}
-];
+}];
 function iso(value) {
 	return value instanceof Date ? value.toISOString() : String(value);
 }
@@ -294,12 +313,10 @@ const DEFAULT_USER_ID = "00000000-0000-4000-8000-000000000001";
 const DEFAULT_DATABASE = "cm";
 /**
 * Ensure schema + fixed dsh user exist. Idempotent; safe to run from any repo
-* construction (version rows skip already-applied migrations). Returns the
-* names of migrations applied on this run (empty when everything was already
-* up to date) — used by the panel's「迁移」button to report progress.
+* construction (version rows skip already-applied migrations).
 */
-async function runMigrations(pgmas, database, userId) {
-	const applied = [];
+async function runMigrations(pgmas, database, _userId) {
+	const appliedNames = [];
 	await pgmas.withClient(database, async (client) => {
 		await client.query("select pg_advisory_lock(747200001)");
 		try {
@@ -310,9 +327,6 @@ async function runMigrations(pgmas, database, userId) {
           applied_at timestamptz not null default now()
         )
       `);
-			await client.query(`insert into users (id, email, password_hash, nickname, created_at, updated_at)
-         values ($1, $2, '', 'dsh', now(), now())
-         on conflict (id) do nothing`, [userId, `dsh+${userId}@dsh.local`]);
 			for (const migration of MIGRATIONS) {
 				if (((await client.query("select 1 from _cm_flow_migrations where version = $1", [migration.version])).rows ?? []).length > 0) continue;
 				await client.query("begin");
@@ -320,7 +334,7 @@ async function runMigrations(pgmas, database, userId) {
 					await migration.apply(client);
 					await client.query("insert into _cm_flow_migrations (version, name) values ($1, $2)", [migration.version, migration.name]);
 					await client.query("commit");
-					applied.push(`v${migration.version} ${migration.name}`);
+					appliedNames.push(`v${migration.version} ${migration.name}`);
 				} catch (error) {
 					await client.query("rollback");
 					throw error;
@@ -330,7 +344,7 @@ async function runMigrations(pgmas, database, userId) {
 			await client.query("select pg_advisory_unlock(747200001)");
 		}
 	});
-	return applied;
+	return appliedNames;
 }
 /** Requirements storage + state machine + stage ledger. */
 var RequirementsRepo = class {
@@ -342,7 +356,7 @@ var RequirementsRepo = class {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
 		this.userId = options.userId ?? "00000000-0000-4000-8000-000000000001";
-		this.ready = runMigrations(this.pgmas, this.database, this.userId);
+		this.ready = runMigrations(this.pgmas, this.database, this.userId).then(() => void 0);
 		this.ready.catch(() => {});
 	}
 	async list(options) {
@@ -644,7 +658,7 @@ var ProjectsRepo = class {
 	constructor(options) {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
-		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001").then(() => void 0);
 		this.ready.catch(() => {});
 	}
 	async list() {
@@ -767,7 +781,7 @@ var QuestionsRepo = class {
 	constructor(options) {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
-		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001").then(() => void 0);
 		this.ready.catch(() => {});
 	}
 	async insertMany(recordId, questions) {
@@ -810,7 +824,7 @@ var ReviewsRepo = class {
 	constructor(options) {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
-		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001").then(() => void 0);
 		this.ready.catch(() => {});
 	}
 	/** Worker：为 record 挂一张 pending 审核单。 */
@@ -936,7 +950,7 @@ var WorkerConfigRepo = class {
 	constructor(options) {
 		this.pgmas = options.pgmas;
 		this.database = options.database ?? "cm";
-		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001");
+		this.ready = runMigrations(this.pgmas, this.database, options.userId ?? "00000000-0000-4000-8000-000000000001").then(() => void 0);
 		this.ready.catch(() => {});
 	}
 	/** 读取当前配置；无行时返回默认值。 */

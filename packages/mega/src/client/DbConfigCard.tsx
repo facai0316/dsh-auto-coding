@@ -131,12 +131,15 @@ export function DbConfigCard({ onError }: Props): ReactElement {
     }
   }
 
-  /** 显式跑一遍 cm 库 schema 迁移（幂等；配好连接后点一下即可补齐 schema）。 */
+  /** 显式跑一遍 cm 库 schema 迁移（幂等；配好连接后点一下即可补齐 schema）。
+   *  始终携带卡片当前草稿值直连目标库——「测试连接成功但迁移仍连旧地址被拒」
+   *  的错位（运行中 pgmas 池可能还是旧配置）不复存在，无需先保存再迁移。 */
   const handleMigrate = async (): Promise<void> => {
+    if (draft === null) return
     setBusy(true)
     setFeedback(null)
     try {
-      const result = await workerConfig.migrate()
+      const result = await workerConfig.migrate(draftToConfig(draft))
       setFeedback({ kind: result.ok ? 'success' : 'error', text: result.message })
     } catch (cause) {
       setFeedback({ kind: 'error', text: `迁移失败:${messageOf(cause)}` })

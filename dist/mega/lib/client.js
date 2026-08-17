@@ -19047,65 +19047,65 @@ onKeyDown: (e) => this.foundation._handleKeyDown(e) });
 			document.head.appendChild(tag);
 		}
 		var RequirementsPanel_module_css_default = {
-			"projectBar": "_jO-6W_projectBar",
-			"success": "_jO-6W_success",
+			"navBadge": "_jO-6W_navBadge",
+			"stageChecks": "_jO-6W_stageChecks",
 			"retrying": "_jO-6W_retrying",
-			"grid": "_jO-6W_grid",
-			"form": "_jO-6W_form",
-			"panel": "_jO-6W_panel",
-			"navRight": "_jO-6W_navRight",
-			"body": "_jO-6W_body",
-			"pager": "_jO-6W_pager",
-			"filters": "_jO-6W_filters",
-			"cardHead": "_jO-6W_cardHead",
+			"card": "_jO-6W_card",
 			"stageDot": "_jO-6W_stageDot",
+			"cardActions": "_jO-6W_cardActions",
+			"navTabActive": "_jO-6W_navTabActive",
+			"center": "_jO-6W_center",
+			"page": "_jO-6W_page",
+			"metaRows": "_jO-6W_metaRows",
+			"toolbar": "_jO-6W_toolbar",
+			"form": "_jO-6W_form",
+			"projectSelect": "_jO-6W_projectSelect",
+			"filters": "_jO-6W_filters",
+			"configSelect": "_jO-6W_configSelect",
+			"navTab": "_jO-6W_navTab",
+			"cardHead": "_jO-6W_cardHead",
+			"cardTitle": "_jO-6W_cardTitle",
+			"markdownBody": "_jO-6W_markdownBody",
+			"questionText": "_jO-6W_questionText",
+			"toolbarInfo": "_jO-6W_toolbarInfo",
+			"questionList": "_jO-6W_questionList",
+			"projectRowName": "_jO-6W_projectRowName",
+			"questionItem": "_jO-6W_questionItem",
 			"formField": "_jO-6W_formField",
 			"metaRow": "_jO-6W_metaRow",
-			"navTabs": "_jO-6W_navTabs",
-			"questionOptions": "_jO-6W_questionOptions",
-			"running": "_jO-6W_running",
-			"projectRowPath": "_jO-6W_projectRowPath",
-			"reviewFeedback": "_jO-6W_reviewFeedback",
-			"toolbar": "_jO-6W_toolbar",
-			"page": "_jO-6W_page",
-			"stageChecks": "_jO-6W_stageChecks",
-			"card": "_jO-6W_card",
-			"navBadge": "_jO-6W_navBadge",
-			"feedback": "_jO-6W_feedback",
-			"waiting_reply": "_jO-6W_waiting_reply",
-			"markdownBody": "_jO-6W_markdownBody",
-			"error": "_jO-6W_error",
-			"stageTimeline": "_jO-6W_stageTimeline",
-			"tagList": "_jO-6W_tagList",
 			"foot": "_jO-6W_foot",
-			"stageRow": "_jO-6W_stageRow",
-			"questionList": "_jO-6W_questionList",
-			"sectionTitle": "_jO-6W_sectionTitle",
-			"metaLabel": "_jO-6W_metaLabel",
-			"reviewList": "_jO-6W_reviewList",
-			"center": "_jO-6W_center",
-			"formRow": "_jO-6W_formRow",
-			"cardHeadActions": "_jO-6W_cardHeadActions",
-			"cardTitle": "_jO-6W_cardTitle",
-			"navTabActive": "_jO-6W_navTabActive",
-			"reviewActions": "_jO-6W_reviewActions",
-			"cardActions": "_jO-6W_cardActions",
-			"waiting_review": "_jO-6W_waiting_review",
-			"questionItem": "_jO-6W_questionItem",
-			"configSelect": "_jO-6W_configSelect",
-			"projectRowName": "_jO-6W_projectRowName",
-			"filterSelect": "_jO-6W_filterSelect",
-			"stageDotPulse": "_jO-6W_stageDotPulse",
-			"failed": "_jO-6W_failed",
-			"projectList": "_jO-6W_projectList",
+			"navRight": "_jO-6W_navRight",
+			"navTabs": "_jO-6W_navTabs",
 			"nav": "_jO-6W_nav",
-			"navTab": "_jO-6W_navTab",
-			"metaRows": "_jO-6W_metaRows",
-			"questionText": "_jO-6W_questionText",
+			"waiting_reply": "_jO-6W_waiting_reply",
+			"stageDotPulse": "_jO-6W_stageDotPulse",
+			"running": "_jO-6W_running",
+			"projectList": "_jO-6W_projectList",
 			"cardDesc": "_jO-6W_cardDesc",
-			"toolbarInfo": "_jO-6W_toolbarInfo",
+			"error": "_jO-6W_error",
+			"stageRow": "_jO-6W_stageRow",
+			"panel": "_jO-6W_panel",
+			"metaLabel": "_jO-6W_metaLabel",
+			"reviewFeedback": "_jO-6W_reviewFeedback",
+			"stageTimeline": "_jO-6W_stageTimeline",
+			"cardHeadActions": "_jO-6W_cardHeadActions",
+			"reviewList": "_jO-6W_reviewList",
+			"body": "_jO-6W_body",
+			"sectionTitle": "_jO-6W_sectionTitle",
+			"formRow": "_jO-6W_formRow",
+			"pager": "_jO-6W_pager",
+			"projectBar": "_jO-6W_projectBar",
+			"questionOptions": "_jO-6W_questionOptions",
+			"reviewActions": "_jO-6W_reviewActions",
+			"feedback": "_jO-6W_feedback",
+			"projectRowPath": "_jO-6W_projectRowPath",
+			"filterSelect": "_jO-6W_filterSelect",
+			"tagList": "_jO-6W_tagList",
+			"grid": "_jO-6W_grid",
+			"success": "_jO-6W_success",
+			"waiting_review": "_jO-6W_waiting_review",
 			"projectRow": "_jO-6W_projectRow",
-			"projectSelect": "_jO-6W_projectSelect"
+			"failed": "_jO-6W_failed"
 		};
 		//#endregion
 		//#region ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.js
@@ -23445,6 +23445,14 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 			codec: codec("string", string().optional()),
 			acceptsUndefined: true
 		});
+		/** 可选对象参数（如 migrate 的 connection 草稿值）。 */
+		const optionalJsonParam = (name) => ({
+			name,
+			wire: name,
+			source: "json",
+			codec: codec("json", record(string(), unknown())),
+			acceptsUndefined: true
+		});
 		const CONTRIBUTION = {
 			package: "@auto-coding/cm-flow",
 			descriptors: [
@@ -23697,7 +23705,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 					namespace: "config",
 					method: "migrate",
 					invocation: { kind: "direct" },
-					parameters: [],
+					parameters: [optionalJsonParam("connection")],
 					result: codec("@auto-coding/cm-flow#MigrationResult", migrationResultSchema)
 				},
 				{
@@ -23898,10 +23906,10 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
 				await whenReady();
 				return unwrap(await remote.config.providers());
 			},
-			/** 显式跑一遍 schema 迁移（幂等）。 */
-			async migrate() {
+			/** 显式跑一遍 schema 迁移（幂等）。connection 传卡片草稿值时直连目标库。 */
+			async migrate(connection) {
 				await whenReady();
-				return unwrap(await remote.config.migrate());
+				return unwrap(await remote.config.migrate(connection));
 			}
 		};
 		const records = {
@@ -26282,12 +26290,15 @@ async resolveConflicts(requirementId) {
 					setBusy(false);
 				}
 			};
-			/** 显式跑一遍 cm 库 schema 迁移（幂等；配好连接后点一下即可补齐 schema）。 */
+			/** 显式跑一遍 cm 库 schema 迁移（幂等；配好连接后点一下即可补齐 schema）。
+			*  始终携带卡片当前草稿值直连目标库——「测试连接成功但迁移仍连旧地址被拒」
+			*  的错位（运行中 pgmas 池可能还是旧配置）不复存在，无需先保存再迁移。 */
 			const handleMigrate = async () => {
+				if (draft === null) return;
 				setBusy(true);
 				setFeedback(null);
 				try {
-					const result = await workerConfig.migrate();
+					const result = await workerConfig.migrate(draftToConfig(draft));
 					setFeedback({
 						kind: result.ok ? "success" : "error",
 						text: result.message

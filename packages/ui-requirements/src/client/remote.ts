@@ -120,6 +120,14 @@ export const workerConfigSchema = z.object({
 })
 export type WorkerConfig = z.infer<typeof workerConfigSchema>
 
+/** config/migrate 的返回：ok + 本次实际应用的迁移列表 + 说明。 */
+export const migrationResultSchema = z.object({
+  ok: z.boolean(),
+  applied: z.array(z.string()),
+  message: z.string(),
+})
+export type MigrationResult = z.infer<typeof migrationResultSchema>
+
 export const llmModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -177,6 +185,7 @@ export interface ConfigRemote {
   get(): Promise<RemoteResult<WorkerConfig>>
   set(config: WorkerConfig): Promise<RemoteResult<WorkerConfig>>
   providers(): Promise<RemoteResult<LlmProviderInfo[]>>
+  migrate(connection?: Record<string, unknown>): Promise<RemoteResult<MigrationResult>>
 }
 
 /** cm-worker 的 merge Typert Remote：审核大厅「解决冲突」按钮入口。 */
@@ -221,6 +230,9 @@ const stringParam = (name: string): ParameterDescriptor =>
   ({ name, wire: name, source: 'json', codec: codec('string', z.string()) })
 const optionalStringParam = (name: string): ParameterDescriptor =>
   ({ name, wire: name, source: 'json', codec: codec('string', z.string().optional()), acceptsUndefined: true })
+/** 可选对象参数（如 migrate 的 connection 草稿值）。 */
+const optionalJsonParam = (name: string): ParameterDescriptor =>
+  ({ name, wire: name, source: 'json', codec: codec('json', z.record(z.string(), z.unknown())), acceptsUndefined: true })
 
 export const CONTRIBUTION: RemoteContribution = {
   package: '@auto-coding/cm-flow',
@@ -470,6 +482,15 @@ export const CONTRIBUTION: RemoteContribution = {
       result: codec('@auto-coding/cm-flow#LlmProviderInfo[]', z.array(llmProviderSchema)),
     },
     {
+      id: '@auto-coding/cm-flow#config/migrate',
+      service: 'cmConfig',
+      namespace: 'config',
+      method: 'migrate',
+      invocation: { kind: 'direct' },
+      parameters: [optionalJsonParam('connection')],
+      result: codec('@auto-coding/cm-flow#MigrationResult', migrationResultSchema),
+    },
+    {
       id: '@auto-coding/cm-worker#merge/resolveConflicts',
       service: 'cmMerge',
       namespace: 'merge',
@@ -697,6 +718,11 @@ export const workerConfig = {
   async providers(): Promise<LlmProviderInfo[]> {
     await whenReady()
     return unwrap(await remote!.config.providers())
+  },
+  /** 显式跑一遍 schema 迁移（幂等）。connection 传卡片草稿值时直连目标库。 */
+  async migrate(connection?: Record<string, unknown>): Promise<{ ok: boolean; applied: string[]; message: string }> {
+    await whenReady()
+    return unwrap(await remote!.config.migrate(connection))
   },
 }
 

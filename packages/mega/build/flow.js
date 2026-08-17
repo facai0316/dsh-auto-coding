@@ -335,25 +335,62 @@ let ConfigService = (() => {
             return this.repo.set(config);
         }
         /**
-         * 显式跑一遍 schema 迁移（幂等：已应用的 version 跳过）。数据库连接卡片
-         * 的「迁移」按钮调用它——配好连接后点一下即可补齐 cm 库 schema，返回本次
-         * 实际应用的迁移列表（空 = 已是最新）。
+         * 显式跑一遍 schema 迁移（幂等）。数据库连接卡片的「迁移」按钮调用。
+         *
+         * 可选 `connection` 参数（卡片当前草稿值）：提供时用一次性 client 直连
+         * 目标库执行迁移——不依赖运行中的 db-pgmas 连接池（池可能在「保存」后
+         * 仍是旧配置，导致「测试连接成功、迁移却连旧地址被拒」的错位）。
+         * 不提供时回退 pgmas 池（老路径）。
          */
-        async migrate() {
+        async migrate(connection) {
             try {
+                if (connection !== undefined && connection.host !== undefined && connection.host !== '') {
+                    const pg = await import('pg');
+                    const pool = new pg.Pool({
+                        host: connection.host,
+                        port: Number(connection.port) || 5432,
+                        user: connection.user,
+                        password: connection.password ?? '',
+                        database: connection.database,
+                        max: 1,
+                        connectionTimeoutMillis: 5_000,
+                    });
+                    pool.on('error', () => { });
+                    const seam = {
+                        withClient: async (_database, fn) => {
+                            const client = await pool.connect();
+                            try {
+                                return await fn(client);
+                            }
+                            finally {
+                                client.release();
+                            }
+                        },
+                    };
+                    try {
+                        const applied = await runCmMigrations(seam, connection.database, this.userId);
+                        return this.migrateResult(applied);
+                    }
+                    finally {
+                        await pool.end().catch(() => { });
+                    }
+                }
                 const applied = await runCmMigrations(this.pgmas, this.database, this.userId);
-                return {
-                    ok: true,
-                    applied,
-                    message: applied.length > 0
-                        ? `已应用 ${applied.length} 个迁移：${applied.join('；')}`
-                        : 'schema 已是最新，无需迁移',
-                };
+                return this.migrateResult(applied);
             }
             catch (cause) {
                 const message = cause instanceof Error ? cause.message : String(cause);
                 return { ok: false, applied: [], message: `迁移失败:${message}` };
             }
+        }
+        migrateResult(applied) {
+            return {
+                ok: true,
+                applied,
+                message: applied.length > 0
+                    ? `已应用 ${applied.length} 个迁移：${applied.join('；')}`
+                    : 'schema 已是最新，无需迁移',
+            };
         }
         /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
         async providers() {

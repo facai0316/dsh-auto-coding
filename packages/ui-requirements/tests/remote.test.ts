@@ -35,6 +35,7 @@ describe('ui-requirements requirements remote contract', () => {
       'config/get',
       'config/set',
       'config/providers',
+      'config/migrate',
       'merge/resolveConflicts',
     ])
   })

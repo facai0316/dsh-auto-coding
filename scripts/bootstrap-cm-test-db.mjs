@@ -57,69 +57,10 @@ function writeSeam(p) {
   }
 }
 
-/** Final state of the coding-manager SeaORM baseline (000001..000006). */
-const BASELINE = `
-create table if not exists users (
-  id            uuid primary key,
-  email         varchar(255) not null unique,
-  password_hash varchar(255) not null,
-  nickname      varchar(255),
-  created_at    timestamptz not null,
-  updated_at    timestamptz not null
-);
-
-create table if not exists requirements (
-  id          uuid primary key,
-  user_id     uuid not null,
-  title       varchar(255) not null,
-  description text,
-  status      varchar(32) not null default 'draft',
-  created_at  timestamptz not null,
-  updated_at  timestamptz not null,
-  constraint "fk-requirements-user-id" foreign key (user_id) references users(id)
-);
-
-create table if not exists records (
-  id             uuid primary key,
-  category       varchar(32) not null,
-  title          varchar(255) not null,
-  message        text,
-  result         text,
-  "references"   text[] not null default '{}',
-  artifacts      text[] not null default '{}',
-  skills         text[] not null default '{}',
-  parent_id      varchar(255),
-  child_id       varchar(255),
-  branch_id      varchar(255),
-  created_at     timestamptz not null,
-  updated_at     timestamptz not null,
-  status         varchar(32) not null default 'pending_approval',
-  requirement_id varchar(255)
-);
-
-create table if not exists branches (
-  id               uuid primary key,
-  name             varchar(255) not null unique,
-  description      text,
-  begin_record_id  varchar(255),
-  auto_delete      boolean not null default false,
-  merge_time       timestamptz,
-  created_at       timestamptz not null,
-  updated_at       timestamptz not null
-);
-`
 
 async function main() {
-  const client = await pool.connect()
-  try {
-    // 1. SeaORM baseline（幂等；cm-flow v1 依赖 requirements 存在）
-    await client.query(BASELINE)
-    console.log(`[bootstrap] baseline tables ensured in ${TEST_DATABASE}`)
-  } finally {
-    client.release()
-  }
-
-  // 2. cm-flow migrations v1..v7 + default dsh user（repo 构造即跑，幂等）
+  // 1. baseline 已废弃（ADR-032）：迁移 v8 自建全量表，无需预建任何表。
+  // 2. cm-flow migrations（repo 构造即跑，幂等；v8 建全量表 + users 种子）
   const repo = new RequirementsRepo({ pgmas: writeSeam(pool), database: TEST_DATABASE })
   await repo.list() // force this.ready
   console.log(`[bootstrap] cm-flow migrations applied in ${TEST_DATABASE}`)

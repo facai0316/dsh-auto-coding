@@ -107,15 +107,25 @@ export declare class ConfigService extends TypertRemoteService {
     get(): Promise<WorkerConfig>;
     set(config: WorkerConfig): Promise<WorkerConfig>;
     /**
-     * 显式跑一遍 schema 迁移（幂等：已应用的 version 跳过）。数据库连接卡片
-     * 的「迁移」按钮调用它——配好连接后点一下即可补齐 cm 库 schema，返回本次
-     * 实际应用的迁移列表（空 = 已是最新）。
+     * 显式跑一遍 schema 迁移（幂等）。数据库连接卡片的「迁移」按钮调用。
+     *
+     * 可选 `connection` 参数（卡片当前草稿值）：提供时用一次性 client 直连
+     * 目标库执行迁移——不依赖运行中的 db-pgmas 连接池（池可能在「保存」后
+     * 仍是旧配置，导致「测试连接成功、迁移却连旧地址被拒」的错位）。
+     * 不提供时回退 pgmas 池（老路径）。
      */
-    migrate(): Promise<{
+    migrate(connection?: {
+        host: string;
+        port: number;
+        user: string;
+        password?: string;
+        database: string;
+    }): Promise<{
         ok: boolean;
         applied: string[];
         message: string;
     }>;
+    private migrateResult;
     /** 已注册提供商及其模型目录（面板模型/提供商下拉数据源）。 */
     providers(): Promise<LlmProviderInfo[]>;
 }

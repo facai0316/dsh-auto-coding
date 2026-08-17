@@ -185,7 +185,7 @@ export interface ConfigRemote {
   get(): Promise<RemoteResult<WorkerConfig>>
   set(config: WorkerConfig): Promise<RemoteResult<WorkerConfig>>
   providers(): Promise<RemoteResult<LlmProviderInfo[]>>
-  migrate(): Promise<RemoteResult<MigrationResult>>
+  migrate(connection?: Record<string, unknown>): Promise<RemoteResult<MigrationResult>>
 }
 
 /** cm-worker 的 merge Typert Remote：审核大厅「解决冲突」按钮入口。 */
@@ -230,6 +230,9 @@ const stringParam = (name: string): ParameterDescriptor =>
   ({ name, wire: name, source: 'json', codec: codec('string', z.string()) })
 const optionalStringParam = (name: string): ParameterDescriptor =>
   ({ name, wire: name, source: 'json', codec: codec('string', z.string().optional()), acceptsUndefined: true })
+/** 可选对象参数（如 migrate 的 connection 草稿值）。 */
+const optionalJsonParam = (name: string): ParameterDescriptor =>
+  ({ name, wire: name, source: 'json', codec: codec('json', z.record(z.string(), z.unknown())), acceptsUndefined: true })
 
 export const CONTRIBUTION: RemoteContribution = {
   package: '@auto-coding/cm-flow',
@@ -484,7 +487,7 @@ export const CONTRIBUTION: RemoteContribution = {
       namespace: 'config',
       method: 'migrate',
       invocation: { kind: 'direct' },
-      parameters: [],
+      parameters: [optionalJsonParam('connection')],
       result: codec('@auto-coding/cm-flow#MigrationResult', migrationResultSchema),
     },
     {
@@ -716,10 +719,10 @@ export const workerConfig = {
     await whenReady()
     return unwrap(await remote!.config.providers())
   },
-  /** 显式跑一遍 schema 迁移（幂等）。 */
-  async migrate(): Promise<{ ok: boolean; applied: string[]; message: string }> {
+  /** 显式跑一遍 schema 迁移（幂等）。connection 传卡片草稿值时直连目标库。 */
+  async migrate(connection?: Record<string, unknown>): Promise<{ ok: boolean; applied: string[]; message: string }> {
     await whenReady()
-    return unwrap(await remote!.config.migrate())
+    return unwrap(await remote!.config.migrate(connection))
   },
 }
 
