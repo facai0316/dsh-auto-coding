@@ -1,7 +1,7 @@
 {
   "name": "@auto-coding/mega",
   "description": "The auto-coding pipeline as ONE distributable dsh bundle: db-pgmas, cm-flow, cm-worker, and the requirements panel shipped as multi-entry package (./db ./flow ./worker ./client) with a bundle patch — git clone + `dsh plugin add` mounts all four rows",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "type": "module",
   "license": "MIT",
   "exports": {

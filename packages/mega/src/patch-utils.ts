@@ -37,7 +37,12 @@ export const PG_DEFAULTS = {
 } as const
 
 export function dshHome(): string {
-  return process.env.DSH_HOME?.trim() !== '' ? process.env.DSH_HOME!.trim() : join(homedir(), '.dsh')
+  // DSH_HOME 未设置时 process.env.DSH_HOME 是 undefined：?.trim() 得
+  // undefined，而 `undefined !== ''` 为 true——旧写法会在未设置时错误地走
+  // 「已设置」分支，undefined.trim() 直接炸掉 pgconfig/get（目标机器
+  // dsh web 不给插件进程设 DSH_HOME，必现「配置卡片一直转圈」）。
+  const value = process.env.DSH_HOME?.trim()
+  return value !== undefined && value !== '' ? value : join(homedir(), '.dsh')
 }
 
 export function resolvePatchPath(config: Config): string {

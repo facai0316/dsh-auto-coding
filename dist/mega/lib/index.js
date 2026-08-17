@@ -30,7 +30,8 @@ const PG_DEFAULTS = {
 	poolMax: 4
 };
 function dshHome() {
-	return process.env.DSH_HOME?.trim() !== "" ? process.env.DSH_HOME.trim() : join(homedir(), ".dsh");
+	const value = process.env.DSH_HOME?.trim();
+	return value !== void 0 && value !== "" ? value : join(homedir(), ".dsh");
 }
 function resolvePatchPath(config) {
 	if (config.patchPath) return config.patchPath;

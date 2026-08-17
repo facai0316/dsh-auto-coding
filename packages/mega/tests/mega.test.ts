@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseDocument } from 'yaml'
-import { upsertRowConfigInText, validatePgConfig } from '../src/patch-utils.ts'
+import { upsertRowConfigInText, validatePgConfig, dshHome, resolvePatchPath } from '../src/patch-utils.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -38,6 +38,25 @@ describe('@auto-coding/mega bundle patch', () => {
 })
 
 describe('@auto-coding/mega shared host helpers', () => {
+  it('dshHome: DSH_HOME 未设置时回退 ~/.dsh（不炸 undefined.trim，ADR-031 现场回归）', () => {
+    // 目标机器 dsh web 不给插件进程设 DSH_HOME → 旧实现 undefined?.trim() !== ''
+    // 判定反了 → undefined.trim() 炸掉 pgconfig/get → 数据库连接卡片永远转圈。
+    const saved = process.env.DSH_HOME
+    try {
+      delete process.env.DSH_HOME
+      expect(dshHome()).toContain('.dsh')
+      // resolvePatchPath 全链路（pgconfig/get 的第一步）同样不得抛错
+      expect(resolvePatchPath({})).toContain(join('.dsh', 'profiles', 'web', 'cordis.patch.yml'))
+      process.env.DSH_HOME = ''
+      expect(dshHome()).toContain('.dsh')
+      process.env.DSH_HOME = '  /custom/dsh  '
+      expect(dshHome()).toBe('/custom/dsh')
+    } finally {
+      if (saved === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = saved
+    }
+  })
+
   it('validates a well-formed pg config (pgconfig remote contract)', () => {
     expect(validatePgConfig({ host: 'h', port: 5432, user: 'u', database: 'd', databases: ['a'], readOnly: true, maxRows: 50 })).toBeUndefined()
   })
