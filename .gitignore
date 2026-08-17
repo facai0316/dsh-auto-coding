@@ -1,7 +1,9 @@
 node_modules/
 lib/
+!dist/mega/lib/
 *.tsbuildinfo
 .npm-cache/
 .pnpm-store/
 .DS_Store
-dist/
+dist/*
+!dist/mega/
