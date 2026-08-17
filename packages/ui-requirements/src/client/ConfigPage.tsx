@@ -115,6 +115,9 @@ export function ConfigPage({ onError }: Props): ReactElement {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  // worker 配置（时段/并发/模型）读库；数据库不可达时的错误单独展示——
+  // 数据库连接卡片是唯一修复入口，绝不能被这个失败连坐卡死（鸡生蛋问题）。
+  const [configError, setConfigError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,8 +126,11 @@ export function ConfigPage({ onError }: Props): ReactElement {
       const [config, providerRows] = await Promise.all([workerConfig.get(), workerConfig.providers()])
       setDraft(toDraft(config))
       setProviders(providerRows)
+      setConfigError(null)
     } catch (cause) {
-      onError(messageOf(cause))
+      // 只拦 worker 配置区：页面骨架与「数据库连接」卡片照常渲染（后者读写
+      // patch 文件 + 一次性试连，不依赖数据库连接池），修好连接后点重试即可。
+      setConfigError(messageOf(cause))
     } finally {
       setLoading(false)
     }
@@ -194,8 +200,37 @@ export function ConfigPage({ onError }: Props): ReactElement {
     return options
   }, [modelOptionsOf])
 
-  if (loading || draft === null) {
+  if (loading && draft === null && configError === null) {
     return <div className={classes.center}><Spin /></div>
+  }
+
+  // worker 配置加载失败（典型：数据库不可达）：数据库连接卡片仍渲染——它是
+  // 修复连接的唯一入口；修好并保存（patch 热生效）后点「重试」读回配置。
+  if (draft === null) {
+    return (
+      <div className={classes.page}>
+        <DbConfigCard onError={onError} />
+        <div className={classes.card}>
+          <div className={classes.sectionTitle}><Typography.Text strong>Worker 配置（时段 / 并发 / 模型）</Typography.Text></div>
+          <div className={classes.form}>
+            {configError === null
+              ? <div className={classes.center}><Spin /></div>
+              : (
+                <>
+                  <Typography.Text type="danger" size="small">{configError}</Typography.Text>
+                  <div className={classes.formRow}>
+                    <Button theme="solid" disabled={busy} onClick={() => { void load() }}>重试</Button>
+                  </div>
+                  <Typography.Text type="tertiary" size="small">
+                    数据库不可达时读不到 worker 配置。先在上方「数据库连接」卡片改好连接并点「保存」（配置热生效），
+                    再回到这里点「重试」；首次使用还需在该卡片点「迁移（建表）」初始化 schema。
+                  </Typography.Text>
+                </>
+              )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const modelField = (

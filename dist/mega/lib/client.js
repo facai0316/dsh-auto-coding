@@ -19047,65 +19047,65 @@ onKeyDown: (e) => this.foundation._handleKeyDown(e) });
 			document.head.appendChild(tag);
 		}
 		var RequirementsPanel_module_css_default = {
-			"projectRow": "_jO-6W_projectRow",
-			"feedback": "_jO-6W_feedback",
-			"projectRowName": "_jO-6W_projectRowName",
-			"reviewList": "_jO-6W_reviewList",
-			"projectSelect": "_jO-6W_projectSelect",
-			"stageDot": "_jO-6W_stageDot",
-			"metaRow": "_jO-6W_metaRow",
-			"failed": "_jO-6W_failed",
-			"navBadge": "_jO-6W_navBadge",
-			"center": "_jO-6W_center",
-			"metaLabel": "_jO-6W_metaLabel",
-			"cardHead": "_jO-6W_cardHead",
-			"pager": "_jO-6W_pager",
-			"formRow": "_jO-6W_formRow",
-			"success": "_jO-6W_success",
-			"grid": "_jO-6W_grid",
-			"navTab": "_jO-6W_navTab",
-			"running": "_jO-6W_running",
-			"card": "_jO-6W_card",
-			"stageTimeline": "_jO-6W_stageTimeline",
-			"reviewActions": "_jO-6W_reviewActions",
-			"form": "_jO-6W_form",
-			"reviewFeedback": "_jO-6W_reviewFeedback",
-			"waiting_review": "_jO-6W_waiting_review",
-			"tagList": "_jO-6W_tagList",
-			"projectBar": "_jO-6W_projectBar",
-			"waiting_reply": "_jO-6W_waiting_reply",
-			"projectList": "_jO-6W_projectList",
-			"questionList": "_jO-6W_questionList",
-			"navTabs": "_jO-6W_navTabs",
-			"toolbar": "_jO-6W_toolbar",
-			"sectionTitle": "_jO-6W_sectionTitle",
-			"filterSelect": "_jO-6W_filterSelect",
-			"questionItem": "_jO-6W_questionItem",
-			"questionOptions": "_jO-6W_questionOptions",
-			"page": "_jO-6W_page",
-			"stageRow": "_jO-6W_stageRow",
-			"configSelect": "_jO-6W_configSelect",
-			"formField": "_jO-6W_formField",
-			"navRight": "_jO-6W_navRight",
-			"metaRows": "_jO-6W_metaRows",
-			"navTabActive": "_jO-6W_navTabActive",
-			"questionText": "_jO-6W_questionText",
-			"error": "_jO-6W_error",
-			"body": "_jO-6W_body",
-			"stageChecks": "_jO-6W_stageChecks",
-			"filters": "_jO-6W_filters",
-			"retrying": "_jO-6W_retrying",
-			"panel": "_jO-6W_panel",
-			"foot": "_jO-6W_foot",
-			"stageDotPulse": "_jO-6W_stageDotPulse",
-			"cardDesc": "_jO-6W_cardDesc",
 			"projectRowPath": "_jO-6W_projectRowPath",
-			"cardTitle": "_jO-6W_cardTitle",
-			"cardActions": "_jO-6W_cardActions",
-			"cardHeadActions": "_jO-6W_cardHeadActions",
 			"toolbarInfo": "_jO-6W_toolbarInfo",
+			"navTabActive": "_jO-6W_navTabActive",
+			"formRow": "_jO-6W_formRow",
+			"navTabs": "_jO-6W_navTabs",
+			"cardHeadActions": "_jO-6W_cardHeadActions",
+			"reviewList": "_jO-6W_reviewList",
+			"sectionTitle": "_jO-6W_sectionTitle",
+			"metaLabel": "_jO-6W_metaLabel",
+			"failed": "_jO-6W_failed",
+			"questionOptions": "_jO-6W_questionOptions",
+			"stageDotPulse": "_jO-6W_stageDotPulse",
+			"retrying": "_jO-6W_retrying",
+			"metaRows": "_jO-6W_metaRows",
+			"filters": "_jO-6W_filters",
+			"waiting_review": "_jO-6W_waiting_review",
+			"page": "_jO-6W_page",
+			"cardHead": "_jO-6W_cardHead",
+			"body": "_jO-6W_body",
+			"form": "_jO-6W_form",
+			"questionText": "_jO-6W_questionText",
+			"card": "_jO-6W_card",
+			"feedback": "_jO-6W_feedback",
+			"filterSelect": "_jO-6W_filterSelect",
+			"cardTitle": "_jO-6W_cardTitle",
+			"foot": "_jO-6W_foot",
+			"projectList": "_jO-6W_projectList",
+			"projectRowName": "_jO-6W_projectRowName",
+			"running": "_jO-6W_running",
+			"metaRow": "_jO-6W_metaRow",
+			"waiting_reply": "_jO-6W_waiting_reply",
+			"questionItem": "_jO-6W_questionItem",
+			"questionList": "_jO-6W_questionList",
+			"projectRow": "_jO-6W_projectRow",
+			"grid": "_jO-6W_grid",
+			"cardDesc": "_jO-6W_cardDesc",
+			"projectSelect": "_jO-6W_projectSelect",
 			"nav": "_jO-6W_nav",
-			"markdownBody": "_jO-6W_markdownBody"
+			"error": "_jO-6W_error",
+			"navBadge": "_jO-6W_navBadge",
+			"stageDot": "_jO-6W_stageDot",
+			"reviewFeedback": "_jO-6W_reviewFeedback",
+			"stageChecks": "_jO-6W_stageChecks",
+			"toolbar": "_jO-6W_toolbar",
+			"stageTimeline": "_jO-6W_stageTimeline",
+			"configSelect": "_jO-6W_configSelect",
+			"tagList": "_jO-6W_tagList",
+			"panel": "_jO-6W_panel",
+			"center": "_jO-6W_center",
+			"success": "_jO-6W_success",
+			"navTab": "_jO-6W_navTab",
+			"navRight": "_jO-6W_navRight",
+			"projectBar": "_jO-6W_projectBar",
+			"reviewActions": "_jO-6W_reviewActions",
+			"markdownBody": "_jO-6W_markdownBody",
+			"cardActions": "_jO-6W_cardActions",
+			"stageRow": "_jO-6W_stageRow",
+			"formField": "_jO-6W_formField",
+			"pager": "_jO-6W_pager"
 		};
 		//#endregion
 		//#region ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.js
@@ -26556,6 +26556,7 @@ async resolveConflicts(requirementId) {
 			const [loading, setLoading] = (0, react.useState)(true);
 			const [busy, setBusy] = (0, react.useState)(false);
 			const [saved, setSaved] = (0, react.useState)(false);
+			const [configError, setConfigError] = (0, react.useState)(null);
 			const load = (0, react.useCallback)(async () => {
 				setLoading(true);
 				onError(null);
@@ -26563,8 +26564,9 @@ async resolveConflicts(requirementId) {
 					const [config, providerRows] = await Promise.all([workerConfig.get(), workerConfig.providers()]);
 					setDraft(toDraft(config));
 					setProviders(providerRows);
+					setConfigError(null);
 				} catch (cause) {
-					onError(messageOf$4(cause));
+					setConfigError(messageOf$4(cause));
 				} finally {
 					setLoading(false);
 				}
@@ -26644,9 +26646,50 @@ async resolveConflicts(requirementId) {
 				});
 				return options;
 			}, [modelOptionsOf]);
-			if (loading || draft === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+			if (loading && draft === null && configError === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 				className: RequirementsPanel_module_css_default.center,
 				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Spin, {})
+			});
+			if (draft === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: RequirementsPanel_module_css_default.page,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)(DbConfigCard, { onError }), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: RequirementsPanel_module_css_default.card,
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: RequirementsPanel_module_css_default.sectionTitle,
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Typography.Text, {
+							strong: true,
+							children: "Worker 配置（时段 / 并发 / 模型）"
+						})
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: RequirementsPanel_module_css_default.form,
+						children: configError === null ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: RequirementsPanel_module_css_default.center,
+							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Spin, {})
+						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Typography.Text, {
+								type: "danger",
+								size: "small",
+								children: configError
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+								className: RequirementsPanel_module_css_default.formRow,
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Button, {
+									theme: "solid",
+									disabled: busy,
+									onClick: () => {
+										load();
+									},
+									children: "重试"
+								})
+							}),
+							/* @__PURE__ */ (0, react_jsx_runtime.jsx)(Typography.Text, {
+								type: "tertiary",
+								size: "small",
+								children: "数据库不可达时读不到 worker 配置。先在上方「数据库连接」卡片改好连接并点「保存」（配置热生效）， 再回到这里点「重试」；首次使用还需在该卡片点「迁移（建表）」初始化 schema。"
+							})
+						] })
+					})]
+				})]
 			});
 			const modelField = (current, providerId, onChange) => /* @__PURE__ */ (0, react_jsx_runtime.jsx)(Select, {
 				className: RequirementsPanel_module_css_default.configSelect,
