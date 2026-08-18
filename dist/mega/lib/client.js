@@ -19047,65 +19047,65 @@ onKeyDown: (e) => this.foundation._handleKeyDown(e) });
 			document.head.appendChild(tag);
 		}
 		var RequirementsPanel_module_css_default = {
-			"navBadge": "_jO-6W_navBadge",
-			"stageChecks": "_jO-6W_stageChecks",
-			"retrying": "_jO-6W_retrying",
-			"card": "_jO-6W_card",
-			"stageDot": "_jO-6W_stageDot",
-			"cardActions": "_jO-6W_cardActions",
-			"navTabActive": "_jO-6W_navTabActive",
-			"center": "_jO-6W_center",
-			"page": "_jO-6W_page",
-			"metaRows": "_jO-6W_metaRows",
-			"toolbar": "_jO-6W_toolbar",
-			"form": "_jO-6W_form",
-			"projectSelect": "_jO-6W_projectSelect",
+			"formRow": "_jO-6W_formRow",
+			"body": "_jO-6W_body",
 			"filters": "_jO-6W_filters",
-			"configSelect": "_jO-6W_configSelect",
-			"navTab": "_jO-6W_navTab",
-			"cardHead": "_jO-6W_cardHead",
-			"cardTitle": "_jO-6W_cardTitle",
-			"markdownBody": "_jO-6W_markdownBody",
-			"questionText": "_jO-6W_questionText",
-			"toolbarInfo": "_jO-6W_toolbarInfo",
-			"questionList": "_jO-6W_questionList",
-			"projectRowName": "_jO-6W_projectRowName",
-			"questionItem": "_jO-6W_questionItem",
-			"formField": "_jO-6W_formField",
-			"metaRow": "_jO-6W_metaRow",
+			"center": "_jO-6W_center",
+			"grid": "_jO-6W_grid",
 			"foot": "_jO-6W_foot",
-			"navRight": "_jO-6W_navRight",
-			"navTabs": "_jO-6W_navTabs",
+			"stageTimeline": "_jO-6W_stageTimeline",
+			"cardTitle": "_jO-6W_cardTitle",
+			"failed": "_jO-6W_failed",
+			"metaRows": "_jO-6W_metaRows",
+			"waiting_review": "_jO-6W_waiting_review",
+			"retrying": "_jO-6W_retrying",
 			"nav": "_jO-6W_nav",
+			"stageChecks": "_jO-6W_stageChecks",
 			"waiting_reply": "_jO-6W_waiting_reply",
-			"stageDotPulse": "_jO-6W_stageDotPulse",
-			"running": "_jO-6W_running",
-			"projectList": "_jO-6W_projectList",
-			"cardDesc": "_jO-6W_cardDesc",
+			"card": "_jO-6W_card",
+			"tagList": "_jO-6W_tagList",
+			"success": "_jO-6W_success",
+			"projectRowPath": "_jO-6W_projectRowPath",
+			"formField": "_jO-6W_formField",
+			"navTab": "_jO-6W_navTab",
+			"navTabActive": "_jO-6W_navTabActive",
 			"error": "_jO-6W_error",
-			"stageRow": "_jO-6W_stageRow",
-			"panel": "_jO-6W_panel",
+			"cardDesc": "_jO-6W_cardDesc",
+			"reviewActions": "_jO-6W_reviewActions",
+			"projectRow": "_jO-6W_projectRow",
+			"markdownBody": "_jO-6W_markdownBody",
+			"sectionTitle": "_jO-6W_sectionTitle",
+			"projectBar": "_jO-6W_projectBar",
+			"filterSelect": "_jO-6W_filterSelect",
+			"projectRowName": "_jO-6W_projectRowName",
+			"running": "_jO-6W_running",
+			"toolbarInfo": "_jO-6W_toolbarInfo",
+			"navRight": "_jO-6W_navRight",
+			"pager": "_jO-6W_pager",
+			"navTabs": "_jO-6W_navTabs",
+			"reviewList": "_jO-6W_reviewList",
+			"page": "_jO-6W_page",
+			"cardHead": "_jO-6W_cardHead",
+			"cardHeadActions": "_jO-6W_cardHeadActions",
+			"cardActions": "_jO-6W_cardActions",
 			"metaLabel": "_jO-6W_metaLabel",
 			"reviewFeedback": "_jO-6W_reviewFeedback",
-			"stageTimeline": "_jO-6W_stageTimeline",
-			"cardHeadActions": "_jO-6W_cardHeadActions",
-			"reviewList": "_jO-6W_reviewList",
-			"body": "_jO-6W_body",
-			"sectionTitle": "_jO-6W_sectionTitle",
-			"formRow": "_jO-6W_formRow",
-			"pager": "_jO-6W_pager",
-			"projectBar": "_jO-6W_projectBar",
+			"metaRow": "_jO-6W_metaRow",
+			"projectList": "_jO-6W_projectList",
+			"form": "_jO-6W_form",
+			"panel": "_jO-6W_panel",
 			"questionOptions": "_jO-6W_questionOptions",
-			"reviewActions": "_jO-6W_reviewActions",
-			"feedback": "_jO-6W_feedback",
-			"projectRowPath": "_jO-6W_projectRowPath",
-			"filterSelect": "_jO-6W_filterSelect",
-			"tagList": "_jO-6W_tagList",
-			"grid": "_jO-6W_grid",
-			"success": "_jO-6W_success",
-			"waiting_review": "_jO-6W_waiting_review",
-			"projectRow": "_jO-6W_projectRow",
-			"failed": "_jO-6W_failed"
+			"stageDot": "_jO-6W_stageDot",
+			"stageDotPulse": "_jO-6W_stageDotPulse",
+			"projectSelect": "_jO-6W_projectSelect",
+			"configSelect": "_jO-6W_configSelect",
+			"questionItem": "_jO-6W_questionItem",
+			"toolbar": "_jO-6W_toolbar",
+			"navBadge": "_jO-6W_navBadge",
+			"questionText": "_jO-6W_questionText",
+			"questionList": "_jO-6W_questionList",
+			"stageRow": "_jO-6W_stageRow",
+			"feedback": "_jO-6W_feedback"
 		};
 		//#endregion
 		//#region ../../node_modules/.pnpm/zod@4.4.3/node_modules/zod/v4/core/core.js
@@ -28866,17 +28866,27 @@ Please report this to https://github.com/markedjs/marked.`, e) {
 		/**
 		* 需求新增表单（需求创建后不允许更改）：项目 + 标题 + 描述（必填）。
 		* 弹层 80% 宽、高度不限（内容区纵向滚动）。
+		*
+		* 项目**必须显式选择**，不做任何静默默认（曾默认 projects[0]，而项目列表按
+		* created_at 升序、种子项目 fac-ai-rs 恒排第一——新建需求会静默绑到旧项目，
+		* 流水线于是在错误的仓库里跑）。选项带本地路径便于区分同名/近似名项目。
 		*/
 		function RequirementFormModal({ visible, projects, busy, onClose, onSubmit }) {
 			const [title, setTitle] = (0, react.useState)("");
 			const [description, setDescription] = (0, react.useState)("");
 			const [projectId, setProjectId] = (0, react.useState)();
+			const opened = (0, react.useRef)(false);
 			(0, react.useEffect)(() => {
-				if (!visible) return;
+				if (!visible) {
+					opened.current = false;
+					return;
+				}
+				if (opened.current) return;
+				opened.current = true;
 				setTitle("");
 				setDescription("");
-				setProjectId(projects[0]?.id);
-			}, [visible, projects]);
+				setProjectId(void 0);
+			}, [visible]);
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(modal_default, {
 				title: "添加需求",
 				visible,
@@ -28913,9 +28923,9 @@ Please report this to https://github.com/markedjs/marked.`, e) {
 								},
 								optionList: projects.map((project) => ({
 									value: project.id,
-									label: project.name
+									label: `${project.name}（${project.localPath}）`
 								})),
-								placeholder: "选择项目"
+								placeholder: "选择项目（必选）"
 							})]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
